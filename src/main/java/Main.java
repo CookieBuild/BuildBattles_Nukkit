@@ -1,8 +1,11 @@
+package main.java;
+
 import cn.nukkit.Player;
 import cn.nukkit.event.Listener;
 import cn.nukkit.level.Location;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.plugin.PluginBase;
+import cn.nukkit.utils.Config;
 
 import java.util.List;
 
@@ -31,6 +34,12 @@ public class Main extends PluginBase implements Listener {
      *
      */
 
+    @Override
+    public void onEnable() {
+        Config config = this.getConfig();
+
+
+    }
 
     /**
      * Teleport the player to the game map when the game start

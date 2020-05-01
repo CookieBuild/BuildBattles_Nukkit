@@ -1,3 +1,5 @@
+package main.java;
+
 import cn.nukkit.Server;
 import cn.nukkit.utils.TextFormat;
 
@@ -64,10 +66,6 @@ public class BuildBattleGame extends Game {
         } else {
             if (nextVotingSlot != this.votingSlot) {
                 //TODO : récolter les votes
-
-
-
-
 
 
                 this.votingSlot = nextVotingSlot;

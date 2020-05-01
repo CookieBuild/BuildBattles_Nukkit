@@ -1,3 +1,5 @@
+package main.java;
+
 import cn.nukkit.Server;
 
 import java.util.ArrayList;

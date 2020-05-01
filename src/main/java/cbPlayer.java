@@ -1,3 +1,5 @@
+package main.java;
+
 import cn.nukkit.Player;
 import cn.nukkit.item.ItemCompass;
 import cn.nukkit.item.ItemCookie;
@@ -19,8 +21,6 @@ import java.io.DataOutputStream;
  * ▒█▄▄█ ▀▀▀▀ ▀▀▀▀ ▀░▀ ▀▀▀ ▀▀▀ 　 ▒█▄▄█ ░▀▀▀ ▀▀▀ ▀▀▀ ▀▀▀░
  */
 public class cbPlayer extends Player {
-
-
 
 
     public boolean isInGame = false;
