@@ -1,9 +1,7 @@
 import cn.nukkit.Player;
 import cn.nukkit.item.ItemCompass;
 import cn.nukkit.item.ItemCookie;
-import cn.nukkit.level.Location;
 import cn.nukkit.level.particle.FloatingTextParticle;
-import cn.nukkit.math.Vector3;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.protocol.ScriptCustomEventPacket;
 import cn.nukkit.network.protocol.TransferPacket;
@@ -12,7 +10,6 @@ import cn.nukkit.utils.TextFormat;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
-import java.util.Objects;
 
 
 /**
@@ -43,6 +40,7 @@ public class cbPlayer extends Player {
     public int Warning = 0;
     public int gameNumber;
     public int lastVote = 0;
+    public int plot;
     public FloatingTextParticle statParticle;
 
     //public Party party, pendingInvite;

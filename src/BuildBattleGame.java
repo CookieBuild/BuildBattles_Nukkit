@@ -1,8 +1,8 @@
-import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.utils.TextFormat;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class BuildBattleGame extends Game {
 
@@ -31,7 +31,7 @@ public class BuildBattleGame extends Game {
      */
     int numberOfPlayersAtStart;
 
-    public String[] plotOwners = {};
+    public List<String> plotOwners = new ArrayList<String>();
 
 
     public BuildBattleGame(int gameNumber, Server server, Main plugin) {
@@ -72,8 +72,8 @@ public class BuildBattleGame extends Game {
 
                 this.votingSlot = nextVotingSlot;
                 for (cbPlayer p : this.getPlayers()) {
-                    p.teleport(this.plugin.pedestals[votingSlot]);
-                    p.sendMessage(TextFormat.GREEN + "> You are voting the plot of " + TextFormat.RESET + plotOwners[votingSlot]);
+                    p.teleport(this.plugin.pedestals.get(votingSlot));
+                    p.sendMessage(TextFormat.GREEN + "> You are voting the plot of " + TextFormat.RESET + plotOwners.get(votingSlot));
 
                 }
 
