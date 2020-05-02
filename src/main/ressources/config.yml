@@ -16,7 +16,7 @@ plot_size: 10
 
 # How far up and down can the player go in his plot
 plot_up: 8
-plot_down: 2
+plot_down: 1
 
 # Set to false if you're not me
 database_enabled: false

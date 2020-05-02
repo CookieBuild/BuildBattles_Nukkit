@@ -8,9 +8,7 @@ import cn.nukkit.event.block.BlockBreakEvent;
 import cn.nukkit.event.block.BlockIgniteEvent;
 import cn.nukkit.event.block.BlockPlaceEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
-import cn.nukkit.event.player.PlayerDropItemEvent;
-import cn.nukkit.event.player.PlayerItemConsumeEvent;
-import cn.nukkit.event.player.PlayerItemHeldEvent;
+import cn.nukkit.event.player.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Location;
 import cn.nukkit.math.Vector3;
@@ -27,6 +25,7 @@ public class Main extends PluginBase implements Listener {
     public boolean isProxyEnabled = false;
 
     public List<Vector3> pedestals;
+    public String[] themes;
 
     /*
      * TODO
@@ -48,6 +47,12 @@ public class Main extends PluginBase implements Listener {
     public void onEnable() {
         Config config = this.getConfig();
         this.isDataBaseEnabled = config.getBoolean("database_enabled");
+        this.isProxyEnabled = config.getBoolean("proxy_enabled");
+
+        String allThemes = config.getString("themes");
+        themes = allThemes.split(",");
+
+        this.getServer().getLogger().info("Loaded " + themes.length + " themes");
 
         // Registering the listeners
         this.getServer().getPluginManager().registerEvents(this, this);
@@ -135,6 +140,36 @@ public class Main extends PluginBase implements Listener {
     }
 
     @EventHandler
+    public void onPlayerPreLoginEvent(PlayerPreLoginEvent event) {
+        if (this.game.state != Game.GAME_OPEN) {
+            event.getPlayer().kick("A game is already running!");
+        }
+    }
+
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        this.onPlayerJoinGame((cbPlayer) event.getPlayer());
+    }
+
+
+    @EventHandler
+    public void onPlayerKicked(PlayerKickEvent event) {
+        cbPlayer player = (cbPlayer) event.getPlayer();
+        if (player.isInGame) {
+            this.game.removePlayer(player);
+        }
+    }
+
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        cbPlayer player = (cbPlayer) event.getPlayer();
+        if (player.isInGame) {
+            this.game.removePlayer(player);
+        }
+    }
+
+    @EventHandler
     public void onEntityDamaged(EntityDamageEvent event) {
         event.setCancelled();
     }
@@ -147,6 +182,10 @@ public class Main extends PluginBase implements Listener {
     @EventHandler
     public void onItemDropped(PlayerDropItemEvent event) {
         event.setCancelled();
+    }
+
+    public void onPlayerJoinGame(cbPlayer player) {
+        game.addPlayer(player);
     }
 
 

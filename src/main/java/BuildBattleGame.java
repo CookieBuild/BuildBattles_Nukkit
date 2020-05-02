@@ -161,4 +161,13 @@ public class BuildBattleGame extends Game {
     public boolean isGameEnded() {
         return false;
     }
+
+    @Override
+    public void resetGame() {
+        super.resetGame();
+        this.plotOwners = new ArrayList<String>();
+        this.plotScores = new ArrayList<>();
+        this.votingSlot = 0;
+        this.isVotingTime = false;
+    }
 }
