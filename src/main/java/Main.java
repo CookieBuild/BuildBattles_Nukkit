@@ -32,12 +32,9 @@ public class Main extends PluginBase implements Listener {
      * TODO
      *  onEnable
      *  Block connections when game has started
-     *  Disable PvP, block breaking/placing when not supposed to ...
-     *  Give blocks in inventory to vote and get votes
      *  Give coins when winning
      *  Send back to hub when finished
      *  Limit mob spawning per player
-     *  Create a config that stores coordinates of plots
      *  Add players to the game when they join. Remove them if disconnected/kicked
      *  Add compass to go back to hub before the game starts
      *  Send messages when joining / game status / voting status / voting choice ....

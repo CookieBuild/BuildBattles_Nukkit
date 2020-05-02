@@ -27,3 +27,6 @@ database_address: 127.0.0.1
 database_name: Cookie
 database_user: Cookie
 database_password: Cookie
+
+# List all themes separated by ","
+themes: Farm, Summer, Camping, Volcano, Guns, House, Candle, Rabbit, Pizza, Car, Emoji, Smartphone, Candies, Birds, Skyscraper, McDonald's, Desk, Fast Food, Food, Dragon, Snowman, Restaurant, Tank, Nintendo, Mario, Clock, BasketBall, Ice Cream, Shop, Shoes, Bag,, Maze, Magic, Winter, Soccer, Airpane, Pokemon, Minions, TV, Lighthouse, Console, Simpsons, Wizard, Halloween, Skeleton, Free Style!, Pixel Art, Science, Animals, Candies, Alien, Sponge Bob, Rocket, Pyramid, Upside Down, Train, Ruins
