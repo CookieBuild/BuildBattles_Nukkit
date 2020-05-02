@@ -90,6 +90,7 @@ public class Main extends PluginBase implements Listener {
 
         this.getServer().getLogger().info("Loaded " + themes.length + " themes");
         this.game = new BuildBattleGame(0, this.getServer(), this);
+        this.game.resetGame();
         this.getServer().loadLevel("game");
 
         for (Level level : this.getServer().getLevels().values()) {

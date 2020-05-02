@@ -7,6 +7,7 @@ import cn.nukkit.utils.TextFormat;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class BuildBattleGame extends Game {
 
@@ -41,6 +42,8 @@ public class BuildBattleGame extends Game {
     int plotHeight = 0;
     int plotDown = 0;
     int plotWidth = 0;
+
+    String theme = "";
 
 
     public List<String> plotOwners = new ArrayList<String>();
@@ -174,5 +177,6 @@ public class BuildBattleGame extends Game {
         this.plotScores = new ArrayList<>();
         this.votingSlot = 0;
         this.isVotingTime = false;
+        this.theme = this.plugin.themes[new Random().nextInt(this.plugin.themes.length)];
     }
 }
