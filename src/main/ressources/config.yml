@@ -14,6 +14,10 @@ plot_8: 100,20,72
 # How wide a plot is. The player won't be able to build further than plot_size blocks from the center of the plot
 plot_size: 10
 
+# How far up and down can the player go in his plot
+plot_up: 8
+plot_down: 2
+
 # Set to false if you're not me
 database_enabled: true
 

@@ -1,7 +1,14 @@
 package main.java;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.Block;
+import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
+import cn.nukkit.event.block.BlockBreakEvent;
+import cn.nukkit.event.block.BlockIgniteEvent;
+import cn.nukkit.event.block.BlockPlaceEvent;
+import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.event.player.PlayerItemConsumeEvent;
 import cn.nukkit.level.Location;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.plugin.PluginBase;
@@ -12,6 +19,7 @@ import java.util.List;
 public class Main extends PluginBase implements Listener {
 
     public BuildBattleGame game;
+    public boolean isDataBaseEnabled = false;
 
     public List<Vector3> pedestals;
 
@@ -37,9 +45,59 @@ public class Main extends PluginBase implements Listener {
     @Override
     public void onEnable() {
         Config config = this.getConfig();
+        this.isDataBaseEnabled = config.getBoolean("database_enabled");
 
+        // Registering the listeners
+        this.getServer().getPluginManager().registerEvents(this, this);
+    }
+
+    @EventHandler
+    public void onBlockIgnite(BlockIgniteEvent event) {
+        // Always block TNT
+        if (event.getBlock().getId() == Block.TNT) {
+            event.setCancelled();
+        }
+
+        if (game.isVotingTime) {
+            event.setCancelled();
+        }
 
     }
+
+    @EventHandler
+    public void onBlockPlaced(BlockPlaceEvent event) {
+        cbPlayer player = (cbPlayer) event.getPlayer();
+        if (!player.isInGame) {
+            event.setCancelled();
+        } else {
+            if (!this.game.hasStarted() || !game.isInPlot(player, event.getBlock().getLocation()) || game.isVotingTime) {
+                event.setCancelled();
+            }
+        }
+    }
+
+    @EventHandler
+    public void onBlockBreaked(BlockBreakEvent event) {
+        cbPlayer player = (cbPlayer) event.getPlayer();
+        if (!player.isInGame) {
+            event.setCancelled();
+        } else {
+            if (!this.game.hasStarted() || !game.isInPlot(player, event.getBlock().getLocation()) || game.isVotingTime) {
+                event.setCancelled();
+            }
+        }
+    }
+
+    @EventHandler
+    public void onEntityDamaged(EntityDamageEvent event){
+        event.setCancelled();
+    }
+
+    @EventHandler
+    public void onItemConsumed(PlayerItemConsumeEvent event){
+        event.setCancelled();
+    }
+
 
     /**
      * Teleport the player to the game map when the game start
