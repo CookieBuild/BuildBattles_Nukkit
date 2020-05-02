@@ -24,6 +24,14 @@ public class Main extends PluginBase implements Listener {
     public boolean isDataBaseEnabled = false;
     public boolean isProxyEnabled = false;
 
+    /**
+     * Database credentials
+     */
+    private String address;
+    private String databaseName;
+    private String username;
+    private String password;
+
     public List<Vector3> pedestals;
     public String[] themes;
 
@@ -48,6 +56,14 @@ public class Main extends PluginBase implements Listener {
         Config config = this.getConfig();
         this.isDataBaseEnabled = config.getBoolean("database_enabled");
         this.isProxyEnabled = config.getBoolean("proxy_enabled");
+
+        if (this.isDataBaseEnabled) {
+            this.address = config.getString("database_address");
+            this.databaseName = config.getString("database_name");
+            this.username = config.getString("database_user");
+            this.password = config.getString("database_password");
+        }
+
 
         String allThemes = config.getString("themes");
         themes = allThemes.split(",");
