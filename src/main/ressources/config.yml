@@ -19,7 +19,8 @@ plot_up: 8
 plot_down: 2
 
 # Set to false if you're not me
-database_enabled: true
+database_enabled: false
+proxy_enabled: false
 
 # Settings for the database
 database_address: 127.0.0.1

@@ -8,6 +8,7 @@ import cn.nukkit.event.block.BlockBreakEvent;
 import cn.nukkit.event.block.BlockIgniteEvent;
 import cn.nukkit.event.block.BlockPlaceEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.event.player.PlayerDropItemEvent;
 import cn.nukkit.event.player.PlayerItemConsumeEvent;
 import cn.nukkit.level.Location;
 import cn.nukkit.math.Vector3;
@@ -20,6 +21,7 @@ public class Main extends PluginBase implements Listener {
 
     public BuildBattleGame game;
     public boolean isDataBaseEnabled = false;
+    public boolean isProxyEnabled = false;
 
     public List<Vector3> pedestals;
 
@@ -89,12 +91,17 @@ public class Main extends PluginBase implements Listener {
     }
 
     @EventHandler
-    public void onEntityDamaged(EntityDamageEvent event){
+    public void onEntityDamaged(EntityDamageEvent event) {
         event.setCancelled();
     }
 
     @EventHandler
-    public void onItemConsumed(PlayerItemConsumeEvent event){
+    public void onItemConsumed(PlayerItemConsumeEvent event) {
+        event.setCancelled();
+    }
+
+    @EventHandler
+    public void onItemDropped(PlayerDropItemEvent event) {
         event.setCancelled();
     }
 

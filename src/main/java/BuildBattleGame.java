@@ -1,6 +1,7 @@
 package main.java;
 
 import cn.nukkit.Server;
+import cn.nukkit.item.Item;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.TextFormat;
 
@@ -43,6 +44,7 @@ public class BuildBattleGame extends Game {
 
 
     public List<String> plotOwners = new ArrayList<String>();
+    public List<Integer> plotScores = new ArrayList<>();
 
 
     public BuildBattleGame(int gameNumber, Server server, Main plugin) {
@@ -64,20 +66,70 @@ public class BuildBattleGame extends Game {
 
         if (this.time >= GAME_LENGTH && !isVotingTime) {
             this.isVotingTime = true;
+            for (cbPlayer player : this.getPlayers()) {
+                player.sendMessage(TextFormat.GREEN + "Time is over ! Voting time");
+                player.getInventory().clearAll();
+                // We give all the colored clays to vote
+                player.getInventory().addItem(Item.get(Item.CLAY, 14));
+                player.getInventory().addItem(Item.get(Item.CLAY, 6));
+                player.getInventory().addItem(Item.get(Item.CLAY, 5));
+                player.getInventory().addItem(Item.get(Item.CLAY, 13));
+                player.getInventory().addItem(Item.get(Item.CLAY, 11));
+                player.getInventory().addItem(Item.get(Item.CLAY, 4));
+            }
         }
 
         int nextVotingSlot = (this.time - GAME_LENGTH) % VOTE_TIME_PER_SLOT;
 
-        if (nextVotingSlot >= numberOfPlayersAtStart) { // If we've voted for everyone
-            //TODO : teleport to the winning slot
+
+        if (nextVotingSlot != this.votingSlot) {
 
 
-        } else {
-            if (nextVotingSlot != this.votingSlot) {
-                //TODO : récolter les votes
+            int score = 0;
+            for (cbPlayer player : this.getPlayers()) {
+                if (player.getName() != this.plotOwners.get(votingSlot))
+                    score += player.lastVote;
+            }
+
+            this.plotScores.add(score);
+
+            this.votingSlot = nextVotingSlot;
+            for (cbPlayer p : this.getPlayers()) {
+                p.sendMessage(TextFormat.GREEN + "> This plot got " + TextFormat.YELLOW + score + TextFormat.GREEN + " points!");
+            }
+
+            if (nextVotingSlot >= numberOfPlayersAtStart) { // If we've voted for everyone
+                if (nextVotingSlot == numberOfPlayersAtStart) {
+                    //TODO : teleport to the winning slot
+                    int bestSlot = 0;
+                    int bestScore = 0;
+                    for (int pS : this.plotScores) {
+                        if (pS > bestScore) {
+                            bestScore = pS;
+                            bestSlot = this.plotScores.indexOf(bestScore);
+                        }
+                    }
+
+                    for (cbPlayer p : this.getPlayers()) {
+                        p.teleport(this.plugin.pedestals.get(bestSlot));
+                        p.sendMessage(TextFormat.GREEN + "> The winner is... " + TextFormat.RESET + plotOwners.get(votingSlot)
+                                + TextFormat.GREEN + " with " + TextFormat.YELLOW + bestScore + TextFormat.GREEN + " points!");
+                        p.sendMessage(TextFormat.GREEN + "> You had " + TextFormat.YELLOW + plotScores.get(p.plot)
+                                + TextFormat.GREEN + " points");
+                    }
+                } else {
+                    for (cbPlayer p : this.getPlayers()) {
+                        if (this.plugin.isProxyEnabled) {
+                            p.proxyTransfer("BbLobby-1");
+                        } else {
+                            p.kick("End of game.");
+                        }
+
+                    }
+                }
 
 
-                this.votingSlot = nextVotingSlot;
+            } else {
                 for (cbPlayer p : this.getPlayers()) {
                     p.teleport(this.plugin.pedestals.get(votingSlot));
                     p.sendMessage(TextFormat.GREEN + "> You are voting the plot of " + TextFormat.RESET + plotOwners.get(votingSlot));
@@ -85,12 +137,15 @@ public class BuildBattleGame extends Game {
                 }
 
             }
+
+
         }
     }
 
     /**
      * Tells if a coordinate is within the plot of a player
-     * @param player : The player which plot needs to be checked
+     *
+     * @param player  : The player which plot needs to be checked
      * @param vector3 : The coordinate that is checked
      * @return true if within plot, else false
      */

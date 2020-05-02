@@ -10,10 +10,21 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../Servers/BuildBattles_Cloudnet/nukkit.jar!/" />
+          <root url="jar://$MODULE_DIR$/../NukkitServers/BuildBattles_Clounet/nukkit.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/../NukkitServers/BuildBattles_Clounet/plugins/DbLib.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES>
+          <root url="jar://$MODULE_DIR$/../NukkitServers/BuildBattles_Clounet/plugins/DbLib.jar!/" />
+        </SOURCES>
       </library>
     </orderEntry>
   </component>
