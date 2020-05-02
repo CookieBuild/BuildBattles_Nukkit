@@ -104,6 +104,18 @@ public class Main extends PluginBase implements Listener {
 
         // Registering the listeners
         this.getServer().getPluginManager().registerEvents(this, this);
+
+        this.getServer().getScheduler().scheduleRepeatingTask(() -> {
+            this.game.tick();
+        }, 20);
+
+        this.getServer().getScheduler().scheduleRepeatingTask(this::sendPopus, 10);
+    }
+
+    public void sendPopus() {
+        for (Player player : this.getServer().getOnlinePlayers().values()) {
+
+        }
     }
 
     @EventHandler
@@ -243,6 +255,24 @@ public class Main extends PluginBase implements Listener {
     public void onItemDropped(PlayerDropItemEvent event) {
         event.setCancelled();
     }
+
+    @EventHandler
+    public void onPlayerMove(PlayerMoveEvent event) {
+        if (event.getPlayer().getLevel() == this.getServer().getDefaultLevel()) {
+            if (event.getTo().y < 4) {
+                event.getPlayer().teleport(event.getPlayer().getLevel().getSpawnLocation());
+            }
+        } else {
+            cbPlayer player = (cbPlayer) event.getPlayer();
+            if (player.isInGame && !game.isVotingTime) {
+                if (!this.game.isInPlot(player, event.getTo())) {
+                    event.setCancelled();
+                    player.teleport(this.pedestals.get(player.plot));
+                }
+            }
+        }
+    }
+
 
     public void onPlayerJoinGame(cbPlayer player) {
         game.addPlayer(player);
