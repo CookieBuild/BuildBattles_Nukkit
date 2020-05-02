@@ -95,6 +95,9 @@ public class Main extends PluginBase implements Listener {
         this.game = new BuildBattleGame(0, this.getServer(), this);
         game.Capacity = this.gameSize;
         this.game.resetGame();
+        this.game.plotWidth = config.getInt("plot_size");
+        this.game.plotHeight = config.getInt("plot_up");
+        this.game.plotDown = config.getInt("plot_down");
         this.getServer().loadLevel("game");
 
         for (Level level : this.getServer().getLevels().values()) {
@@ -127,9 +130,9 @@ public class Main extends PluginBase implements Listener {
                 player.sendPopup(text);
             } else {
 
-                String text = TextFormat.GREEN + "Theme :" + TextFormat.AQUA + game.theme + TextFormat.GREEN + " Time remaining : " + TextFormat.AQUA + (BuildBattleGame.GAME_LENGTH - game.time) + "seconds";
+                String text = TextFormat.GREEN + "Theme : " + TextFormat.AQUA + game.theme + TextFormat.GREEN + " Time remaining : " + TextFormat.AQUA + (BuildBattleGame.GAME_LENGTH - game.time) + " seconds";
                 if (game.isVotingTime) {
-                    text = TextFormat.GREEN + "Theme :" + TextFormat.AQUA + game.theme + TextFormat.GREEN + " Vote now ! Plot Owner : " + game.plotOwners.get(game.votingSlot);
+                    text = TextFormat.GREEN + "Theme : " + TextFormat.AQUA + game.theme + TextFormat.GREEN + " Vote now ! Plot Owner : " + game.plotOwners.get(game.votingSlot);
                 }
                 player.sendPopup(text);
             }
@@ -197,7 +200,7 @@ public class Main extends PluginBase implements Listener {
     public void onItemHeld(PlayerItemHeldEvent event) {
         cbPlayer player = (cbPlayer) event.getPlayer();
         if (game.hasStarted() && game.isVotingTime) {
-            if (event.getItem().getId() == Item.CLAY) {
+            if (event.getItem().getId() == Item.CLAY_BLOCK) {
                 int vote = 0;
                 String voteText = TextFormat.WHITE + "NEUTRAL";
                 switch (event.getItem().getDamage()) {
@@ -292,20 +295,19 @@ public class Main extends PluginBase implements Listener {
 
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent event) {
-        /**
-         if (event.getPlayer().getLevel() == this.getServer().getDefaultLevel()) {
-         if (event.getTo().y < 4) {
-         event.getPlayer().teleport(event.getPlayer().getLevel().getSpawnLocation());
-         }
-         } else {
-         cbPlayer player = (cbPlayer) event.getPlayer();
-         if (player.isInGame && !game.isVotingTime) {
-         if (!this.game.isInPlot(player, event.getTo())) {
-         event.setCancelled();
-         player.teleport(this.pedestals.get(player.plot));
-         }
-         }
-         }*/
+
+        if (event.getPlayer().getLevel() == this.getServer().getDefaultLevel()) {
+            if (event.getTo().y < 4) {
+                event.getPlayer().teleport(event.getPlayer().getLevel().getSpawnLocation());
+            }
+        } else {
+            cbPlayer player = (cbPlayer) event.getPlayer();
+            if (player.isInGame && !game.isVotingTime) {
+                if (!this.game.isInPlot(player, event.getTo())) {
+                    player.teleport(this.pedestals.get(player.plot));
+                }
+            }
+        }
 
     }
 

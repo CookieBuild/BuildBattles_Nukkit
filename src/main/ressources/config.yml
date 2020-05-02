@@ -2,20 +2,20 @@
 game_size: 8
 
 # The coordinates of each plot (the center of the plot)
-plot_0: 184,20,156
-plot_1: 184,20,114
-plot_2: 142,20,114
-plot_3: 142,20,156
-plot_4: 100,20,114
-plot_5: 56,20,114
-plot_6: 56,20,72
-plot_7: 100,20,72
+plot_0: 185,5,155
+plot_1: 185,5,112
+plot_2: 143,5,112
+plot_3: 143,5,155
+plot_4: 101,5,112
+plot_5: 60,5,112
+plot_6: 60,5,70
+plot_7: 101,5,70
 
 # How wide a plot is. The player won't be able to build further than plot_size blocks from the center of the plot
-plot_size: 10
+plot_size: 25
 
 # How far up and down can the player go in his plot
-plot_up: 8
+plot_up: 20
 plot_down: 1
 
 # Set to false if you're not me
