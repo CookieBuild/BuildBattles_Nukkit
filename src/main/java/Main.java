@@ -113,8 +113,22 @@ public class Main extends PluginBase implements Listener {
     }
 
     public void sendPopus() {
+        String playerCount = this.getServer().getOnlinePlayers().size() + "/" + game.Capacity;
+
         for (Player player : this.getServer().getOnlinePlayers().values()) {
 
+
+            if (this.game.state == Game.GAME_OPEN) {
+                String text = TextFormat.RED + (game.startTimer > 0 ? " Starting in " + (game.START_DELAY - game.startTimer) + " " : " Waiting for players to join... ") + TextFormat.BLUE + playerCount;
+                player.sendPopup(text);
+            } else {
+
+                String text = TextFormat.GREEN + "Theme :" + TextFormat.AQUA + game.theme + TextFormat.GREEN + " Time remaining : " + TextFormat.AQUA + (BuildBattleGame.GAME_LENGTH - game.time) + " + seconds";
+                if (game.isVotingTime) {
+                    text = TextFormat.GREEN + "Theme :" + TextFormat.AQUA + game.theme + TextFormat.GREEN + " Vote now ! Plot Owner : " + game.plotOwners.get(game.votingSlot);
+                }
+                player.sendPopup(text);
+            }
         }
     }
 
