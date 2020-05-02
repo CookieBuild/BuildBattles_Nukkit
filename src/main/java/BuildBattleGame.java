@@ -29,7 +29,7 @@ public class BuildBattleGame extends Game {
     /**
      * Which slot is currently being voted
      */
-    int votingSlot = 0;
+    int votingSlot = -1;
 
     /**
      * How many players where in the game when it started
@@ -81,36 +81,24 @@ public class BuildBattleGame extends Game {
                 player.sendMessage(TextFormat.GREEN + "Time is over ! Voting time");
                 player.getInventory().clearAll();
                 // We give all the colored clays to vote
-                player.getInventory().addItem(Item.get(Item.CLAY_BLOCK, 14));
-                player.getInventory().addItem(Item.get(Item.CLAY_BLOCK, 6));
-                player.getInventory().addItem(Item.get(Item.CLAY_BLOCK, 5));
-                player.getInventory().addItem(Item.get(Item.CLAY_BLOCK, 13));
-                player.getInventory().addItem(Item.get(Item.CLAY_BLOCK, 11));
-                player.getInventory().addItem(Item.get(Item.CLAY_BLOCK, 4));
+                player.getInventory().addItem(Item.get(Item.STAINED_HARDENED_CLAY, 14));
+                player.getInventory().addItem(Item.get(Item.STAINED_HARDENED_CLAY, 6));
+                player.getInventory().addItem(Item.get(Item.STAINED_HARDENED_CLAY, 5));
+                player.getInventory().addItem(Item.get(Item.STAINED_HARDENED_CLAY, 13));
+                player.getInventory().addItem(Item.get(Item.STAINED_HARDENED_CLAY, 11));
+                player.getInventory().addItem(Item.get(Item.STAINED_HARDENED_CLAY, 4));
             }
         }
         if (isVotingTime) {
-            int nextVotingSlot = Math.floorDiv((GAME_LENGTH - this.time), VOTE_TIME_PER_SLOT);
+            int nextVotingSlot = Math.floorDiv((this.time - GAME_LENGTH), VOTE_TIME_PER_SLOT);
 
 
             if (nextVotingSlot != this.votingSlot) {
 
 
-                int score = 0;
-                for (cbPlayer player : this.getPlayers()) {
-                    if (player.plot != votingSlot)
-                        score += player.lastVote;
-                }
-
-                this.plotScores.add(score);
-
-                this.votingSlot = nextVotingSlot;
-                for (cbPlayer p : this.getPlayers()) {
-                    p.sendMessage(TextFormat.GREEN + "> This plot got " + TextFormat.YELLOW + score + TextFormat.GREEN + " points!");
-                }
 
                 if (nextVotingSlot >= numberOfPlayersAtStart) { // If we've voted for everyone
-                    if (nextVotingSlot == numberOfPlayersAtStart) {
+                    if (nextVotingSlot == numberOfPlayersAtStart && (this.time - GAME_LENGTH) % VOTE_TIME_PER_SLOT == 0) {
                         //TODO : teleport to the winning slot
                         int bestSlot = 0;
                         int bestScore = 0;
@@ -123,7 +111,7 @@ public class BuildBattleGame extends Game {
 
                         for (cbPlayer p : this.getPlayers()) {
                             p.teleport(this.plugin.pedestals.get(bestSlot));
-                            p.sendMessage(TextFormat.GREEN + "> The winner is... " + TextFormat.RESET + plotOwners.get(votingSlot)
+                            p.sendMessage(TextFormat.GREEN + "> The winner is... " + TextFormat.RESET + plotOwners.get(bestSlot)
                                     + TextFormat.GREEN + " with " + TextFormat.YELLOW + bestScore + TextFormat.GREEN + " points!");
                             if (p.plot == bestSlot) {
                                 this.plugin.giveCoins(p, bestScore);
@@ -141,6 +129,11 @@ public class BuildBattleGame extends Game {
 
 
                         }
+
+                        for (cbPlayer p : this.getPlayers()) {
+                            p.kick("End of game.");
+                            // We kick again if there are still a proxy player
+                        }
                         // Game has ended. Everyone is gone, time to reset
                         this.resetGame();
 
@@ -151,6 +144,21 @@ public class BuildBattleGame extends Game {
 
 
                 } else {
+
+                    int score = 0;
+                    for (cbPlayer player : this.getPlayers()) {
+                        if (player.plot != votingSlot)
+                            score += player.lastVote;
+                    }
+
+                    this.plotScores.add(score);
+
+                    this.votingSlot = nextVotingSlot;
+                    for (cbPlayer p : this.getPlayers()) {
+                        p.sendMessage(TextFormat.GREEN + "> This plot got " + TextFormat.YELLOW + score + TextFormat.GREEN + " points!");
+                    }
+
+
                     for (cbPlayer p : this.getPlayers()) {
                         p.teleport(this.plugin.pedestals.get(votingSlot));
                         p.sendMessage(TextFormat.GREEN + "> You are voting the plot of " + TextFormat.RESET + plotOwners.get(votingSlot));
@@ -177,7 +185,7 @@ public class BuildBattleGame extends Game {
         Vector3 plot = this.plugin.pedestals.get(player.plot);
         return (plot.x + plotWidth > vector3.x && plot.x - plotWidth < vector3.x
                 && plot.y + plotHeight > vector3.y && plot.y - plotDown < vector3.y
-                && plot.z + plotHeight > vector3.z && plot.z - plotHeight < vector3.z);
+                && plot.z + plotWidth > vector3.z && plot.z - plotWidth < vector3.z);
     }
 
     @Override
@@ -190,7 +198,7 @@ public class BuildBattleGame extends Game {
         super.resetGame();
         this.plotOwners = new ArrayList<String>();
         this.plotScores = new ArrayList<>();
-        this.votingSlot = 0;
+        this.votingSlot = -1;
         this.isVotingTime = false;
         this.theme = this.plugin.themes[new Random().nextInt(this.plugin.themes.length)];
     }

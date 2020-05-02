@@ -132,7 +132,12 @@ public class Main extends PluginBase implements Listener {
 
                 String text = TextFormat.GREEN + "Theme : " + TextFormat.AQUA + game.theme + TextFormat.GREEN + " Time remaining : " + TextFormat.AQUA + (BuildBattleGame.GAME_LENGTH - game.time) + " seconds";
                 if (game.isVotingTime) {
-                    text = TextFormat.GREEN + "Theme : " + TextFormat.AQUA + game.theme + TextFormat.GREEN + " Vote now ! Plot Owner : " + game.plotOwners.get(game.votingSlot);
+                    if (game.votingSlot < game.numberOfPlayersAtStart) {
+                        text = TextFormat.GREEN + "Theme : " + TextFormat.AQUA + game.theme + TextFormat.GREEN + " Vote now ! Plot Owner : " + game.plotOwners.get(game.votingSlot);
+                    } else {
+                        text = "";
+                    }
+
                 }
                 player.sendPopup(text);
             }
@@ -200,7 +205,7 @@ public class Main extends PluginBase implements Listener {
     public void onItemHeld(PlayerItemHeldEvent event) {
         cbPlayer player = (cbPlayer) event.getPlayer();
         if (game.hasStarted() && game.isVotingTime) {
-            if (event.getItem().getId() == Item.CLAY_BLOCK) {
+            if (event.getItem().getId() == Item.STAINED_HARDENED_CLAY) {
                 int vote = 0;
                 String voteText = TextFormat.WHITE + "NEUTRAL";
                 switch (event.getItem().getDamage()) {
@@ -210,7 +215,7 @@ public class Main extends PluginBase implements Listener {
                         break;
                     case 6:
                         vote = -1;
-                        voteText = TextFormat.RED + "VERY BAD";
+                        voteText = TextFormat.RED + "BAD";
                         break;
                     case 5:
                         vote = 1;
