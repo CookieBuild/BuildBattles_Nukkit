@@ -111,7 +111,10 @@ public class cbPlayer extends Player {
     }
 
     public void loginComplete() {
-        this.sendMessage(TextFormat.GREEN + "Welcome to " + TextFormat.AQUA + "Cookie " + TextFormat.YELLOW + "Build" + TextFormat.GREEN + " BuildBattles!");
+        this.getServer().getScheduler().scheduleDelayedTask(() -> {
+            this.sendMessage(TextFormat.GREEN + "Welcome to " + TextFormat.AQUA + "Cookie " + TextFormat.YELLOW + "Build" + TextFormat.DARK_PURPLE + " BuildBattles!");
+
+        }, 80);
     }
 
     public void setAuthenticated(boolean isAuthenticated) {

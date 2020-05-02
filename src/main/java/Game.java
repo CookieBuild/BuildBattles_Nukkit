@@ -1,6 +1,7 @@
 package main.java;
 
 import cn.nukkit.Server;
+import cn.nukkit.utils.TextFormat;
 
 import java.util.ArrayList;
 
@@ -14,7 +15,7 @@ public abstract class Game {
     public final static int GAME_STARTING = 1;
     public final static int GAME_RUNNING = 2;
     public final static int GAME_FINISHED = 3;
-    final public int START_DELAY = 30;
+    final public int START_DELAY = 60;
 
     public boolean isFilling = false;
 
@@ -63,32 +64,23 @@ public abstract class Game {
      */
     public void tick() {
         // If the game is opened and has more than two players ...
-
-
-        switch (this.state) {
-            case GAME_OPEN:
-                if (startTimer > 0) {
-                    startTimer++;
-                }
-                break;
-            case GAME_STARTING:
-                if (startTimer >= START_DELAY) {
-                    this.startGame();
-                    startTimer = 0;
-                }
-
-                break;
-            default:
-
-                break;
+        if (this.state == GAME_OPEN) {
+            if (startTimer > 0) {
+                startTimer++;
+            }
+            if (startTimer >= START_DELAY) {
+                this.startGame();
+                startTimer = 0;
+            }
         }
     }
 
     public void startGame() {
-        this.state = Game.GAME_STARTING;
+        this.state = Game.GAME_RUNNING;
         this.isFilling = false;
         for (cbPlayer player : players) {
             this.plugin.teleportToGame(player);
+            player.sendMessage(TextFormat.GREEN + "> The game has started!");
         }
 
     }

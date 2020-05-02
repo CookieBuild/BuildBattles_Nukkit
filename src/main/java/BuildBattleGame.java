@@ -61,6 +61,14 @@ public class BuildBattleGame extends Game {
     }
 
     @Override
+    public void addPlayer(cbPlayer player) {
+        super.addPlayer(player);
+        if (startTimer == 0 && this.getPlayers().size() >= 2) {
+            startTimer += 1;
+        }
+    }
+
+    @Override
     public void tick() {
         super.tick();
         if (this.hasStarted()) {
@@ -131,9 +139,14 @@ public class BuildBattleGame extends Game {
                             p.kick("End of game.");
                         }
 
+
                     }
                     // Game has ended. Everyone is gone, time to reset
                     this.resetGame();
+
+                    // Unload + reload to reset map
+                    this.server.unloadLevel(this.server.getLevelByName("game"), true);
+                    this.server.loadLevel("game");
                 }
 
 

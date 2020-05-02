@@ -2,6 +2,8 @@ package main.java;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.command.Command;
+import cn.nukkit.command.CommandSender;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.block.BlockBreakEvent;
@@ -72,6 +74,7 @@ public class Main extends PluginBase implements Listener {
 
         this.gameSize = config.getInt("game_size");
 
+
         for (int i = 0; i < gameSize; i++) {
             try {
                 String[] xyz = config.getString("plot_" + i).split(",");
@@ -90,6 +93,7 @@ public class Main extends PluginBase implements Listener {
 
         this.getServer().getLogger().info("Loaded " + themes.length + " themes");
         this.game = new BuildBattleGame(0, this.getServer(), this);
+        game.Capacity = this.gameSize;
         this.game.resetGame();
         this.getServer().loadLevel("game");
 
@@ -123,7 +127,7 @@ public class Main extends PluginBase implements Listener {
                 player.sendPopup(text);
             } else {
 
-                String text = TextFormat.GREEN + "Theme :" + TextFormat.AQUA + game.theme + TextFormat.GREEN + " Time remaining : " + TextFormat.AQUA + (BuildBattleGame.GAME_LENGTH - game.time) + " + seconds";
+                String text = TextFormat.GREEN + "Theme :" + TextFormat.AQUA + game.theme + TextFormat.GREEN + " Time remaining : " + TextFormat.AQUA + (BuildBattleGame.GAME_LENGTH - game.time) + "seconds";
                 if (game.isVotingTime) {
                     text = TextFormat.GREEN + "Theme :" + TextFormat.AQUA + game.theme + TextFormat.GREEN + " Vote now ! Plot Owner : " + game.plotOwners.get(game.votingSlot);
                 }
@@ -143,6 +147,21 @@ public class Main extends PluginBase implements Listener {
             event.setCancelled();
         }
 
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        cbPlayer player = (cbPlayer) sender;
+        switch (command.getName()) {
+            case "ping":
+                sender.sendMessage(TextFormat.GREEN + " > Your ping is " + TextFormat.YELLOW + ((cbPlayer) sender).getPing() + " ms");
+                break;
+            case "pos":
+                if (sender != null)
+                    sender.sendMessage(((Player) sender).getLocation().toString());
+                break;
+        }
+        return true;
     }
 
     @EventHandler
@@ -249,6 +268,7 @@ public class Main extends PluginBase implements Listener {
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
+        event.setQuitMessage((String) null);
         cbPlayer player = (cbPlayer) event.getPlayer();
         if (player.isInGame) {
             this.game.removePlayer(player);
@@ -272,19 +292,21 @@ public class Main extends PluginBase implements Listener {
 
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent event) {
-        if (event.getPlayer().getLevel() == this.getServer().getDefaultLevel()) {
-            if (event.getTo().y < 4) {
-                event.getPlayer().teleport(event.getPlayer().getLevel().getSpawnLocation());
-            }
-        } else {
-            cbPlayer player = (cbPlayer) event.getPlayer();
-            if (player.isInGame && !game.isVotingTime) {
-                if (!this.game.isInPlot(player, event.getTo())) {
-                    event.setCancelled();
-                    player.teleport(this.pedestals.get(player.plot));
-                }
-            }
-        }
+        /**
+         if (event.getPlayer().getLevel() == this.getServer().getDefaultLevel()) {
+         if (event.getTo().y < 4) {
+         event.getPlayer().teleport(event.getPlayer().getLevel().getSpawnLocation());
+         }
+         } else {
+         cbPlayer player = (cbPlayer) event.getPlayer();
+         if (player.isInGame && !game.isVotingTime) {
+         if (!this.game.isInPlot(player, event.getTo())) {
+         event.setCancelled();
+         player.teleport(this.pedestals.get(player.plot));
+         }
+         }
+         }*/
+
     }
 
 
@@ -307,7 +329,7 @@ public class Main extends PluginBase implements Listener {
         this.game.plotOwners.add(player.getName());
 
         // Teleport the player to his plot
-        Location location = Location.fromObject(this.pedestals.get(player.plot));
+        Location location = Location.fromObject(this.pedestals.get(player.plot), this.getServer().getLevelByName("game"));
         player.teleport(location);
 
         player.setGamemode(Player.CREATIVE);

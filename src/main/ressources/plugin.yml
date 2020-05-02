@@ -7,3 +7,21 @@ api: ["1.0.0"]
 load: POSTWORLD
 author: Guillaume351
 description: Cookie Build Build Battles - for Nukkit
+
+
+commands:
+  pos:
+    description: Get your coordinates
+    usage: "/pos"
+    permission: buildbattle.account.basic
+
+  ping:
+    description: See your ping
+    usage: "/ping"
+    permission: buildbattle.account.basic
+
+
+permissions:
+  buildbattle.account.basic:
+    description: "Allow the user to /pos"
+    default: true
