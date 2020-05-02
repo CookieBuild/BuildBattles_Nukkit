@@ -10,6 +10,7 @@ import cn.nukkit.event.block.BlockBreakEvent;
 import cn.nukkit.event.block.BlockIgniteEvent;
 import cn.nukkit.event.block.BlockPlaceEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.event.entity.ExplosionPrimeEvent;
 import cn.nukkit.event.player.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
@@ -142,6 +143,11 @@ public class Main extends PluginBase implements Listener {
                 player.sendPopup(text);
             }
         }
+    }
+
+    @EventHandler
+    public void onExplosionEvent(ExplosionPrimeEvent event) {
+        event.setCancelled();
     }
 
     @EventHandler
