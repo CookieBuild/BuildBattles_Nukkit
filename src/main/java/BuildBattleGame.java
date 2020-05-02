@@ -129,6 +129,8 @@ public class BuildBattleGame extends Game {
                         }
 
                     }
+                    // Game has ended. Everyone is gone, time to reset
+                    this.resetGame();
                 }
 
 

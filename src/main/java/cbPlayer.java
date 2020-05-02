@@ -110,12 +110,8 @@ public class cbPlayer extends Player {
         this.dataPacket(pk);
     }
 
-    public void refreshStatParticle() {
-
-
+    public void loginComplete() {
         this.sendMessage(TextFormat.GREEN + "Welcome to " + TextFormat.AQUA + "Cookie " + TextFormat.YELLOW + "Build" + TextFormat.GREEN + " BuildBattles!");
-
-
     }
 
     public void setAuthenticated(boolean isAuthenticated) {

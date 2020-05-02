@@ -10,20 +10,26 @@ import cn.nukkit.event.block.BlockPlaceEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.player.*;
 import cn.nukkit.item.Item;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.Location;
+import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.plugin.PluginBase;
 import cn.nukkit.utils.Config;
 import cn.nukkit.utils.TextFormat;
 import main.java.Data.dataBaseQuery;
+import main.java.Data.getPlayerDataTask;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class Main extends PluginBase implements Listener {
 
     public BuildBattleGame game;
+    public List<Vector3> pedestals = new ArrayList<>();
     public boolean isDataBaseEnabled = false;
     public boolean isProxyEnabled = false;
+    String gameMapName = "game";
 
     /**
      * Database credentials
@@ -32,8 +38,7 @@ public class Main extends PluginBase implements Listener {
     private String databaseName;
     private String username;
     private String password;
-
-    public List<Vector3> pedestals;
+    int gameSize = 8;
     public String[] themes;
 
     /*
@@ -65,11 +70,36 @@ public class Main extends PluginBase implements Listener {
             this.password = config.getString("database_password");
         }
 
+        this.gameSize = config.getInt("game_size");
+
+        for (int i = 0; i < gameSize; i++) {
+            try {
+                String[] xyz = config.getString("plot_" + i).split(",");
+                pedestals.add(new Vector3(Integer.parseInt(xyz[0].trim()) + 0.5, Integer.parseInt(xyz[1].trim()) + 0.5, Integer.parseInt(xyz[2].trim()) + 0.5));
+                this.getServer().getLogger().info("Plot " + i + " is " + config.getString("plot_" + i));
+            } catch (Exception e) {
+                this.getServer().getLogger().error(e.getMessage());
+            }
+
+
+        }
+
 
         String allThemes = config.getString("themes");
         themes = allThemes.split(",");
 
         this.getServer().getLogger().info("Loaded " + themes.length + " themes");
+        this.game = new BuildBattleGame(0, this.getServer(), this);
+        this.getServer().loadLevel("game");
+
+        for (Level level : this.getServer().getLevels().values()) {
+            for (FullChunk chunk : level.getChunks().values()) {
+                level.loadChunk(chunk.getX(), chunk.getZ());
+            }
+            level.setTime(8000);
+            level.setRaining(false);
+            level.stopTime();
+        }
 
         // Registering the listeners
         this.getServer().getPluginManager().registerEvents(this, this);
@@ -86,6 +116,11 @@ public class Main extends PluginBase implements Listener {
             event.setCancelled();
         }
 
+    }
+
+    @EventHandler
+    public void onPlayerCreated(PlayerCreationEvent event) {
+        event.setPlayerClass(cbPlayer.class);
     }
 
     @EventHandler
@@ -165,6 +200,13 @@ public class Main extends PluginBase implements Listener {
 
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
+        event.getPlayer().setFoodEnabled(false);
+        event.setJoinMessage("");
+
+        if (isDataBaseEnabled) {
+            this.getServer().getScheduler().scheduleTask(new getPlayerDataTask(event.getPlayer().getName(), address, databaseName, username, password), true);
+        }
+
         this.onPlayerJoinGame((cbPlayer) event.getPlayer());
     }
 
@@ -203,6 +245,9 @@ public class Main extends PluginBase implements Listener {
 
     public void onPlayerJoinGame(cbPlayer player) {
         game.addPlayer(player);
+        if (game.getPlayers().size() == gameSize) {
+            game.startGame();
+        }
     }
 
 
@@ -230,9 +275,7 @@ public class Main extends PluginBase implements Listener {
             player.coins += coins;
             player.storedPlayerData.coins += coins;
             String query = "UPDATE data set playerCoins = (playerCoins + " + coins + ") where playerName = '" + player.getName() + "' ;";
-            this.getServer().getScheduler().scheduleTask(new dataBaseQuery(query, address, databaseName, username, password));
+            this.getServer().getScheduler().scheduleTask(new dataBaseQuery(query, address, databaseName, username, password), true);
         }
-
-
     }
 }
