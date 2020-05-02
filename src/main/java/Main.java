@@ -126,9 +126,13 @@ public class Main extends PluginBase implements Listener {
                         voteText = TextFormat.MINECOIN_GOLD + "LEGENDARY";
                         break;
                 }
+                if (this.game.votingSlot != player.plot) {
+                    player.lastVote = vote;
+                    player.sendMessage(TextFormat.GREEN + "> Your vote : " + voteText);
+                } else {
+                    player.sendMessage(TextFormat.RED + "> You can't vote for your own plot!");
+                }
 
-                player.lastVote = vote;
-                player.sendMessage(TextFormat.GREEN + "> Your vote : " + voteText);
             }
         }
     }

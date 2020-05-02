@@ -87,7 +87,7 @@ public class BuildBattleGame extends Game {
 
             int score = 0;
             for (cbPlayer player : this.getPlayers()) {
-                if (player.getName() != this.plotOwners.get(votingSlot))
+                if (player.plot != votingSlot)
                     score += player.lastVote;
             }
 
