@@ -114,6 +114,9 @@ public class BuildBattleGame extends Game {
                         p.teleport(this.plugin.pedestals.get(bestSlot));
                         p.sendMessage(TextFormat.GREEN + "> The winner is... " + TextFormat.RESET + plotOwners.get(votingSlot)
                                 + TextFormat.GREEN + " with " + TextFormat.YELLOW + bestScore + TextFormat.GREEN + " points!");
+                        if (p.plot == bestSlot) {
+                            this.plugin.giveCoins(p, bestScore);
+                        }
                         p.sendMessage(TextFormat.GREEN + "> You had " + TextFormat.YELLOW + plotScores.get(p.plot)
                                 + TextFormat.GREEN + " points");
                     }

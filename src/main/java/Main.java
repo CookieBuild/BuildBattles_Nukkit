@@ -15,6 +15,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.plugin.PluginBase;
 import cn.nukkit.utils.Config;
 import cn.nukkit.utils.TextFormat;
+import main.java.Data.dataBaseQuery;
 
 import java.util.List;
 
@@ -220,6 +221,18 @@ public class Main extends PluginBase implements Listener {
         player.teleport(location);
 
         player.setGamemode(Player.CREATIVE);
+
+    }
+
+
+    public void giveCoins(cbPlayer player, int coins) {
+        if (this.isDataBaseEnabled) {
+            player.coins += coins;
+            player.storedPlayerData.coins += coins;
+            String query = "UPDATE data set playerCoins = (playerCoins + " + coins + ") where playerName = '" + player.getName() + "' ;";
+            this.getServer().getScheduler().scheduleTask(new dataBaseQuery(query, address, databaseName, username, password));
+        }
+
 
     }
 }

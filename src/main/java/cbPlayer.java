@@ -9,6 +9,7 @@ import cn.nukkit.network.protocol.ScriptCustomEventPacket;
 import cn.nukkit.network.protocol.TransferPacket;
 import cn.nukkit.scheduler.TaskHandler;
 import cn.nukkit.utils.TextFormat;
+import main.java.Data.PlayerData;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -44,7 +45,7 @@ public class cbPlayer extends Player {
     public FloatingTextParticle statParticle;
 
     //public Party party, pendingInvite;
-    //public PlayerData storedPlayerData;
+    public PlayerData storedPlayerData;
 
     public String serverName = "\u2584\u2580\u2580\u2584\u2500\u2584\u2580\u2580\u2584\u2500\u2584\u2580\u2580\u2584\u2500\u2588\u2500\u2584\u2580\u2500\u2588\u2500\u2588\u2580\u2580\u2500\u2500\u2500\u2588\u2580\u2584\u2500\u2588\u2500\u2500\u2588\u2500\u2588\u2500\u2588\u2500\u2500\u2500\u2588\u2580\u2584\n\u2588\u2500\u2500\u2584\u2500\u2588\u2500\u2500\u2588\u2500\u2588\u2500\u2500\u2588\u2500\u2588\u2580\u2584\u2500\u2500\u2588\u2500\u2588\u2580\u2580\u2500\u2500\u2500\u2588\u2580\u2588\u2500\u2588\u2500\u2500\u2588\u2500\u2588\u2500\u2588\u2500\u2500\u2500\u2588\u2500\u2588\n─▀▀───▀▀───▀▀──▀──▀─▀─▀▀▀───▀▀───▀▀──▀─▀▀▀─▀▀─";
     public String serverType = "█▄─▄█─█─▄▀▀▄─█▀▄─▄▀▀▄─█▀▄─▄▀▄─▀█▀─▀█▀─█───█▀▀─▄▀▀\n█─▀─█─█─█──▄─██▀─█──█─█▀█─█▀█──█───█──█───█▀▀──▀▄\n▀───▀─▀──▀▀──▀─▀──▀▀──▀▀──▀─▀──▀───▀──▀▀▀─▀▀▀─▀▀─";
