@@ -10,10 +10,13 @@ import cn.nukkit.event.block.BlockPlaceEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.player.PlayerDropItemEvent;
 import cn.nukkit.event.player.PlayerItemConsumeEvent;
+import cn.nukkit.event.player.PlayerItemHeldEvent;
+import cn.nukkit.item.Item;
 import cn.nukkit.level.Location;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.plugin.PluginBase;
 import cn.nukkit.utils.Config;
+import cn.nukkit.utils.TextFormat;
 
 import java.util.List;
 
@@ -86,6 +89,46 @@ public class Main extends PluginBase implements Listener {
         } else {
             if (!this.game.hasStarted() || !game.isInPlot(player, event.getBlock().getLocation()) || game.isVotingTime) {
                 event.setCancelled();
+            }
+        }
+    }
+
+    @EventHandler
+    public void onItemHeld(PlayerItemHeldEvent event) {
+        cbPlayer player = (cbPlayer) event.getPlayer();
+        if (game.hasStarted() && game.isVotingTime) {
+            if (event.getItem().getId() == Item.CLAY) {
+                int vote = 0;
+                String voteText = TextFormat.WHITE + "NEUTRAL";
+                switch (event.getItem().getDamage()) {
+                    case 14:
+                        vote = -2;
+                        voteText = TextFormat.DARK_RED + "VERY BAD";
+                        break;
+                    case 6:
+                        vote = -1;
+                        voteText = TextFormat.RED + "VERY BAD";
+                        break;
+                    case 5:
+                        vote = 1;
+                        voteText = TextFormat.YELLOW + "OK";
+                        break;
+                    case 13:
+                        vote = 3;
+                        voteText = TextFormat.GREEN + "GOOD";
+                        break;
+                    case 11:
+                        vote = 5;
+                        voteText = TextFormat.AQUA + "EPIC";
+                        break;
+                    case 4:
+                        vote = 7;
+                        voteText = TextFormat.MINECOIN_GOLD + "LEGENDARY";
+                        break;
+                }
+
+                player.lastVote = vote;
+                player.sendMessage(TextFormat.GREEN + "> Your vote : " + voteText);
             }
         }
     }
