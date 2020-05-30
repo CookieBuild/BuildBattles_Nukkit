@@ -2,6 +2,8 @@ package main.java;
 
 import cn.nukkit.Server;
 import cn.nukkit.utils.TextFormat;
+import de.dytanic.cloudnet.ext.bridge.BridgeHelper;
+import de.dytanic.cloudnet.ext.bridge.nukkit.NukkitCloudNetHelper;
 
 import java.util.ArrayList;
 
@@ -24,7 +26,7 @@ public abstract class Game {
     public int startTimer;
     public int state = GAME_OPEN;
 
-    public int Capacity = 12;
+    public int Capacity = 8;
     public int numberOfTeams;
 
     private ArrayList<cbPlayer> players = new ArrayList<cbPlayer>();
@@ -83,6 +85,9 @@ public abstract class Game {
             player.sendMessage(TextFormat.GREEN + "> The game has started!");
         }
 
+        NukkitCloudNetHelper.setState("RUNNING");
+        BridgeHelper.updateServiceInfo();
+
     }
 
     public boolean hasStarted(){
@@ -95,7 +100,9 @@ public abstract class Game {
         this.time = 0;
         this.startTimer = 0;
         players = new ArrayList<cbPlayer>();
-
+        NukkitCloudNetHelper.setState("OPEN");
+        NukkitCloudNetHelper.setMaxPlayers(Capacity);
+        BridgeHelper.updateServiceInfo();
     }
 
     public abstract boolean isGameEnded();

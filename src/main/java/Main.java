@@ -20,6 +20,8 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.plugin.PluginBase;
 import cn.nukkit.utils.Config;
 import cn.nukkit.utils.TextFormat;
+import de.dytanic.cloudnet.ext.bridge.BridgeHelper;
+import de.dytanic.cloudnet.ext.bridge.nukkit.NukkitCloudNetHelper;
 import main.java.Data.dataBaseQuery;
 import main.java.Data.getPlayerDataTask;
 
@@ -282,6 +284,10 @@ public class Main extends PluginBase implements Listener {
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
+        if (game.state != Game.GAME_OPEN) {
+            NukkitCloudNetHelper.setMaxPlayers(this.getServer().getOnlinePlayers().size() - 1);
+            BridgeHelper.updateServiceInfo();
+        }
         event.setQuitMessage((String) null);
         cbPlayer player = (cbPlayer) event.getPlayer();
         if (player.isInGame) {
