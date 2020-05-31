@@ -355,13 +355,38 @@ public class Main extends PluginBase implements Listener {
 
     }
 
-
-    public void giveCoins(cbPlayer player, int coins) {
+    /**
+     * Add coin to the player data
+     *
+     * @param player
+     * @param coins
+     * @return The amount of coins given (depending on rank, bonus...)
+     */
+    public int giveCoins(cbPlayer player, int coins) {
         if (this.isDataBaseEnabled) {
-            player.coins += coins;
-            player.storedPlayerData.coins += coins;
-            String query = "UPDATE data set playerCoins = (playerCoins + " + coins + ") where playerName = '" + player.getName() + "' ;";
+            int coinMultiplier = 1;
+            if (player.hasPermission("group.vip")) {
+                coinMultiplier = 2;
+            }
+            if (player.hasPermission("group.vip+")) {
+                coinMultiplier = 3;
+            }
+            if (player.hasPermission("group.legend")) {
+                coinMultiplier = 4;
+            }
+            if (player.hasPermission("group.titan")) {
+                coinMultiplier = 5;
+            }
+
+            int amount = coins * coinMultiplier;
+
+            player.coins += amount;
+            player.storedPlayerData.coins += amount;
+            String query = "UPDATE data set playerCoins = (playerCoins + " + amount + ") where playerName = '" + player.getName() + "' ;";
             this.getServer().getScheduler().scheduleTask(new dataBaseQuery(query, address, databaseName, username, password), true);
+            return amount;
+
         }
+        return coins;
     }
 }
