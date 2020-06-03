@@ -123,7 +123,7 @@ public class BuildBattleGame extends Game {
                     } else {
                         for (cbPlayer p : this.getPlayers()) {
                             if (this.plugin.isProxyEnabled) {
-                                p.proxyTransfer("BbLobby-1");
+                                p.proxyTransfer("Lobby-1");
                             } else {
                                 p.kick("End of game.");
                             }
@@ -161,7 +161,7 @@ public class BuildBattleGame extends Game {
 
 
                     for (cbPlayer p : this.getPlayers()) {
-                        p.teleport(this.plugin.pedestals.get(votingSlot));
+                        p.teleport(this.plugin.pedestals.get(votingSlot).add(0, 6, 0));
                         p.sendMessage(TextFormat.GREEN + "> You are voting the plot of " + TextFormat.RESET + plotOwners.get(votingSlot));
 
                     }
