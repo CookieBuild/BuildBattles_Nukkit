@@ -98,28 +98,30 @@ public class BuildBattleGame extends Game {
 
 
                 if (nextVotingSlot >= numberOfPlayersAtStart) { // If we've voted for everyone
-                    if (nextVotingSlot == numberOfPlayersAtStart && (this.time - GAME_LENGTH) % VOTE_TIME_PER_SLOT == 0) {
-                        //TODO : teleport to the winning slot
-                        int bestSlot = 0;
-                        int bestScore = 0;
-                        for (int pS : this.plotScores) {
-                            if (pS > bestScore) {
-                                bestScore = pS;
-                                bestSlot = this.plotScores.indexOf(bestScore);
+                    if (nextVotingSlot == numberOfPlayersAtStart) {
+                        if ((this.time - GAME_LENGTH) % VOTE_TIME_PER_SLOT == 0) {
+                            int bestSlot = 0;
+                            int bestScore = 0;
+                            for (int pS : this.plotScores) {
+                                if (pS > bestScore) {
+                                    bestScore = pS;
+                                    bestSlot = this.plotScores.indexOf(bestScore);
+                                }
+                            }
+
+                            for (cbPlayer p : this.getPlayers()) {
+                                p.teleport(this.plugin.pedestals.get(bestSlot));
+                                p.sendMessage(TextFormat.GREEN + "> The winner is... " + TextFormat.RESET + plotOwners.get(bestSlot)
+                                        + TextFormat.GREEN + " with " + TextFormat.YELLOW + bestScore + TextFormat.GREEN + " points!");
+                                if (p.plot == bestSlot) {
+                                    int coinsReceived = this.plugin.giveCoins(p, bestScore);
+                                    p.sendMessage(TextFormat.GREEN + "> You won! You received " + coinsReceived + " coins!");
+                                }
+                                p.sendMessage(TextFormat.GREEN + "> You had " + TextFormat.YELLOW + plotScores.get(p.plot)
+                                        + TextFormat.GREEN + " points");
                             }
                         }
 
-                        for (cbPlayer p : this.getPlayers()) {
-                            p.teleport(this.plugin.pedestals.get(bestSlot));
-                            p.sendMessage(TextFormat.GREEN + "> The winner is... " + TextFormat.RESET + plotOwners.get(bestSlot)
-                                    + TextFormat.GREEN + " with " + TextFormat.YELLOW + bestScore + TextFormat.GREEN + " points!");
-                            if (p.plot == bestSlot) {
-                                int coinsReceived = this.plugin.giveCoins(p, bestScore);
-                                p.sendMessage(TextFormat.GREEN + "> You won! You received " + coinsReceived + " coins!");
-                            }
-                            p.sendMessage(TextFormat.GREEN + "> You had " + TextFormat.YELLOW + plotScores.get(p.plot)
-                                    + TextFormat.GREEN + " points");
-                        }
                     } else {
                         for (cbPlayer p : this.getPlayers()) {
                             if (this.plugin.isProxyEnabled) {
