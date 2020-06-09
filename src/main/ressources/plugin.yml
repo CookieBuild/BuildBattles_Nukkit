@@ -15,9 +15,9 @@ commands:
     usage: "/pos"
     permission: buildbattle.account.basic
 
-  ping:
-    description: See your ping
-    usage: "/ping"
+  floor:
+    description: Set the floor of your plot. Only works when the game has started and you hold a block
+    usage: "/floor"
     permission: buildbattle.account.basic
 
 

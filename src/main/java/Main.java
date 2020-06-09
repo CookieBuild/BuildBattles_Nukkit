@@ -13,6 +13,7 @@ import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.ExplosionPrimeEvent;
 import cn.nukkit.event.player.*;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
@@ -167,8 +168,20 @@ public class Main extends PluginBase implements Listener {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         cbPlayer player = (cbPlayer) sender;
         switch (command.getName()) {
-            case "ping":
-                sender.sendMessage(TextFormat.GREEN + " > Your ping is " + TextFormat.YELLOW + ((cbPlayer) sender).getPing() + " ms");
+            case "floor":
+                if (this.game.hasStarted() && player.getInventory().getItemInHand() instanceof ItemBlock) {
+                    double x = this.pedestals.get(player.plot).x;
+                    double z = this.pedestals.get(player.plot).z;
+                    for (double xt = x - this.game.plotWidth; xt < x + this.game.plotWidth; xt++) {
+                        for (double zt = z - this.game.plotWidth; zt < z + this.game.plotWidth; zt++) {
+                            player.getLevel().setBlock(new Vector3(xt, this.pedestals.get(player.plot).y - this.game.plotDown + 1, zt), player.getInventory().getItemInHand().getBlock());
+                        }
+                    }
+                    player.sendMessage(TextFormat.GREEN + "> Floor set!");
+                    return true;
+                }
+
+
                 break;
             case "pos":
                 if (sender != null)
@@ -253,7 +266,7 @@ public class Main extends PluginBase implements Listener {
 
     @EventHandler
     public void onPlayerPreLoginEvent(PlayerPreLoginEvent event) {
-        if (this.game.state != Game.GAME_OPEN) {
+        if (this.game.state != Game.GAME_OPEN || this.getServer().getOnlinePlayers().values().size() >= this.game.Capacity) {
             event.getPlayer().kick("A game is already running!");
         }
     }

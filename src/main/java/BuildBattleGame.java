@@ -58,6 +58,9 @@ public class BuildBattleGame extends Game {
     public void startGame() {
         super.startGame();
         this.numberOfPlayersAtStart = this.getPlayers().size();
+        for (cbPlayer player : this.getPlayers()) {
+            player.sendMessage(TextFormat.GREEN + "> Use /floor while holding a block to set the floor of your plot!");
+        }
     }
 
     @Override
