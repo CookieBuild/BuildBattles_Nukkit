@@ -103,13 +103,16 @@ public class BuildBattleGame extends Game {
                 if (nextVotingSlot >= numberOfPlayersAtStart) { // If we've voted for everyone
                     if (nextVotingSlot == numberOfPlayersAtStart) {
                         if ((this.time - GAME_LENGTH) % VOTE_TIME_PER_SLOT == 0) {
+                            int ind = 0;
+
                             int bestSlot = 0;
                             int bestScore = 0;
                             for (int pS : this.plotScores) {
                                 if (pS > bestScore) {
                                     bestScore = pS;
-                                    bestSlot = this.plotScores.indexOf(bestScore);
+                                    bestSlot = ind;
                                 }
+                                ind++;
                             }
 
                             for (cbPlayer p : this.getPlayers()) {
@@ -153,8 +156,9 @@ public class BuildBattleGame extends Game {
 
                     int score = 0;
                     for (cbPlayer player : this.getPlayers()) {
-                        if (player.plot != votingSlot)
+                        if (player.plot != votingSlot) {
                             score += player.lastVote;
+                        }
                     }
 
                     this.plotScores.add(score);
