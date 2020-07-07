@@ -2,14 +2,10 @@ package main.java.Data;
 
 import cn.nukkit.Server;
 import cn.nukkit.scheduler.AsyncTask;
-import com.mysql.jdbc.Connection;
-import com.mysql.jdbc.PreparedStatement;
 import main.java.Main;
 import main.java.cbPlayer;
 
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 
 /**
  * Created by Guillaume Claverie on 14/01/2017.
