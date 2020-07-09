@@ -164,6 +164,9 @@ public class BuildBattleGame extends Game {
                         // Unload + reload to reset map
                         this.server.unloadLevel(this.server.getLevelByName("game"), true);
                         this.server.loadLevel("game");
+                        this.server.getLevelByName("game").setTime(6000);
+                        this.server.getLevelByName("game").stopTime();
+                        this.server.getLevelByName("game").setRaining(false);
                     }
 
 

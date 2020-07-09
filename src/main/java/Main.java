@@ -11,6 +11,7 @@ import cn.nukkit.event.block.BlockIgniteEvent;
 import cn.nukkit.event.block.BlockPlaceEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.ExplosionPrimeEvent;
+import cn.nukkit.event.level.WeatherChangeEvent;
 import cn.nukkit.event.player.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
@@ -133,7 +134,7 @@ public class Main extends PluginBase implements Listener {
             } else {
 
                 String text = TextFormat.GREEN + "Theme : " + TextFormat.AQUA + game.theme + TextFormat.GREEN + " Time remaining : " + TextFormat.AQUA + (BuildBattleGame.GAME_LENGTH - game.time) + " seconds";
-                if (game.isVotingTime) {
+                if (game.isVotingTime && game.votingSlot != -1) {
                     if (game.votingSlot < game.numberOfPlayersAtStart) {
                         text = TextFormat.GREEN + "Theme : " + TextFormat.AQUA + game.theme + TextFormat.GREEN + " Vote now ! Plot Owner : " + game.plotOwners.get(game.votingSlot);
                     } else {
@@ -144,6 +145,12 @@ public class Main extends PluginBase implements Listener {
                 player.sendPopup(text);
             }
         }
+    }
+
+    @EventHandler
+    public void onWeatherChange(WeatherChangeEvent event) {
+        event.setCancelled();
+
     }
 
     @EventHandler
@@ -275,6 +282,7 @@ public class Main extends PluginBase implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         event.getPlayer().setFoodEnabled(false);
         event.setJoinMessage("");
+        event.getPlayer().getSkin().setTrusted(true);
 
         if (isDataBaseEnabled) {
             this.getServer().getScheduler().scheduleTask(new getPlayerDataTask(event.getPlayer().getName(), address, databaseName, username, password), true);
