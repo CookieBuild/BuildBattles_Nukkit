@@ -97,6 +97,7 @@ public class BuildBattleGame extends Game {
 
 
             if (nextVotingSlot != this.votingSlot) {
+
                 if (nextVotingSlot >= 1) {
                     int score = 0;
                     for (cbPlayer player : this.getPlayers()) {
@@ -107,12 +108,13 @@ public class BuildBattleGame extends Game {
 
                     this.plotScores.add(score);
 
-                    this.votingSlot = nextVotingSlot;
                     for (cbPlayer p : this.getPlayers()) {
                         p.sendMessage(TextFormat.GREEN + "> This plot got " + TextFormat.YELLOW + score + TextFormat.GREEN + " points!");
                     }
 
                 }
+
+                this.votingSlot = nextVotingSlot;
 
 
                 if (nextVotingSlot >= numberOfPlayersAtStart) { // If we've voted for everyone
