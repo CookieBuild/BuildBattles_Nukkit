@@ -1,5 +1,5 @@
 name: BuildBattles
-main: main.java.Main
+main: BuildBattles.Main
 
 version: "1.0.0"
 api: ["1.0.0"]

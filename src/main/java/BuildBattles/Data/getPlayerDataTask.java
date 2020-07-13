@@ -1,9 +1,9 @@
-package main.java.Data;
+package BuildBattles.Data;
 
+import BuildBattles.Main;
+import BuildBattles.cbPlayer;
 import cn.nukkit.Server;
 import cn.nukkit.scheduler.AsyncTask;
-import main.java.Main;
-import main.java.cbPlayer;
 
 import java.sql.*;
 

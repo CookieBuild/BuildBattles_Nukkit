@@ -1,5 +1,7 @@
-package main.java;
+package BuildBattles;
 
+import BuildBattles.Data.dataBaseQuery;
+import BuildBattles.Data.getPlayerDataTask;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.command.Command;
@@ -22,8 +24,6 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.plugin.PluginBase;
 import cn.nukkit.utils.Config;
 import cn.nukkit.utils.TextFormat;
-import main.java.Data.dataBaseQuery;
-import main.java.Data.getPlayerDataTask;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,7 +31,7 @@ import java.util.List;
 public class Main extends PluginBase implements Listener {
 
     public BuildBattleGame game;
-    public List<Vector3> pedestals = new ArrayList<>();
+    public List<Vector3> pedestals = new ArrayList<Vector3>();
     public boolean isDataBaseEnabled = false;
     public boolean isProxyEnabled = false;
     String gameMapName = "game";

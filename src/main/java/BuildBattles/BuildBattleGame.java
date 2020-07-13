@@ -1,4 +1,4 @@
-package main.java;
+package BuildBattles;
 
 import cn.nukkit.Server;
 import cn.nukkit.item.Item;

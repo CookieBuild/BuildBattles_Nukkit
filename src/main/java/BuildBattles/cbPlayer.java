@@ -1,5 +1,6 @@
-package main.java;
+package BuildBattles;
 
+import BuildBattles.Data.PlayerData;
 import cn.nukkit.Player;
 import cn.nukkit.item.ItemCompass;
 import cn.nukkit.item.ItemCookie;
@@ -9,7 +10,6 @@ import cn.nukkit.network.protocol.ScriptCustomEventPacket;
 import cn.nukkit.network.protocol.TransferPacket;
 import cn.nukkit.scheduler.TaskHandler;
 import cn.nukkit.utils.TextFormat;
-import main.java.Data.PlayerData;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;

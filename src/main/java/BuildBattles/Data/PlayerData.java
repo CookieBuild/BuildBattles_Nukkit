@@ -1,4 +1,4 @@
-package main.java.Data;
+package BuildBattles.Data;
 
 
 /**
