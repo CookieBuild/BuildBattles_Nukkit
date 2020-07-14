@@ -84,9 +84,10 @@ public abstract class Game {
             this.plugin.teleportToGame(player);
             player.sendMessage(TextFormat.GREEN + "> The game has started!");
         }
-
-        NukkitCloudNetHelper.setState("RUNNING");
-        BridgeHelper.updateServiceInfo();
+        if (this.plugin.isProxyEnabled) {
+            NukkitCloudNetHelper.setState("RUNNING");
+            BridgeHelper.updateServiceInfo();
+        }
 
     }
 
@@ -100,9 +101,12 @@ public abstract class Game {
         this.time = 0;
         this.startTimer = 0;
         players = new ArrayList<cbPlayer>();
-        NukkitCloudNetHelper.setState("OPEN");
-        NukkitCloudNetHelper.setMaxPlayers(Capacity);
-        BridgeHelper.updateServiceInfo();
+        if (this.plugin.isProxyEnabled) {
+            NukkitCloudNetHelper.setState("OPEN");
+            NukkitCloudNetHelper.setMaxPlayers(Capacity);
+            BridgeHelper.updateServiceInfo();
+        }
+
     }
 
     public abstract boolean isGameEnded();

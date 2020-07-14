@@ -63,7 +63,7 @@ public class getPlayerDataTask extends AsyncTask {
 
             resultSet.close();
             preparedStatement3.close();
-            //connect.close();
+            connect.close();
 
 
             Object[] result = new Object[2];

@@ -39,7 +39,7 @@ public class dataBaseQuery extends AsyncTask {
             PreparedStatement preparedStatement = (PreparedStatement) connect.prepareStatement(this.query);
             preparedStatement.executeUpdate();
             preparedStatement.close();
-            //connect.close();
+            connect.close();
 
         } catch (SQLException e) {
             e.printStackTrace();
