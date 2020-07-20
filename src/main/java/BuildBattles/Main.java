@@ -64,6 +64,7 @@ public class Main extends PluginBase implements Listener {
 
     @Override
     public void onEnable() {
+        this.saveDefaultConfig();
         Config config = this.getConfig();
         this.isDataBaseEnabled = config.getBoolean("database_enabled");
         this.isProxyEnabled = config.getBoolean("proxy_enabled");
