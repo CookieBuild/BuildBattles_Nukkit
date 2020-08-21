@@ -13,6 +13,7 @@ import cn.nukkit.utils.TextFormat;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
+import java.net.InetSocketAddress;
 
 
 /**
@@ -22,7 +23,6 @@ import java.io.DataOutputStream;
  * ▒█▄▄█ ▀▀▀▀ ▀▀▀▀ ▀░▀ ▀▀▀ ▀▀▀ 　 ▒█▄▄█ ░▀▀▀ ▀▀▀ ▀▀▀ ▀▀▀░
  */
 public class cbPlayer extends Player {
-
 
     public boolean isInGame = false;
     public int vip = -1;
@@ -50,8 +50,8 @@ public class cbPlayer extends Player {
     public String serverName = "\u2584\u2580\u2580\u2584\u2500\u2584\u2580\u2580\u2584\u2500\u2584\u2580\u2580\u2584\u2500\u2588\u2500\u2584\u2580\u2500\u2588\u2500\u2588\u2580\u2580\u2500\u2500\u2500\u2588\u2580\u2584\u2500\u2588\u2500\u2500\u2588\u2500\u2588\u2500\u2588\u2500\u2500\u2500\u2588\u2580\u2584\n\u2588\u2500\u2500\u2584\u2500\u2588\u2500\u2500\u2588\u2500\u2588\u2500\u2500\u2588\u2500\u2588\u2580\u2584\u2500\u2500\u2588\u2500\u2588\u2580\u2580\u2500\u2500\u2500\u2588\u2580\u2588\u2500\u2588\u2500\u2500\u2588\u2500\u2588\u2500\u2588\u2500\u2500\u2500\u2588\u2500\u2588\n─▀▀───▀▀───▀▀──▀──▀─▀─▀▀▀───▀▀───▀▀──▀─▀▀▀─▀▀─";
     public String serverType = "█▄─▄█─█─▄▀▀▄─█▀▄─▄▀▀▄─█▀▄─▄▀▄─▀█▀─▀█▀─█───█▀▀─▄▀▀\n█─▀─█─█─█──▄─██▀─█──█─█▀█─█▀█──█───█──█───█▀▀──▀▄\n▀───▀─▀──▀▀──▀─▀──▀▀──▀▀──▀─▀──▀───▀──▀▀▀─▀▀▀─▀▀─";
 
-    public cbPlayer(SourceInterface interfaz, Long clientID, String ip, int port) {
-        super(interfaz, clientID, ip, port);
+    public cbPlayer(SourceInterface interfaz, Long clientID, InetSocketAddress socketAddress) {
+        super(interfaz, clientID, socketAddress);
     }
 
     public void regenerateDisplayName() {
