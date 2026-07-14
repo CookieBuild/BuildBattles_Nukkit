@@ -1,0 +1,11 @@
+rootProject.name = 'BuildBattles'
+
+def cookieDoughDirectory = file('../CookieDough')
+if (!cookieDoughDirectory.isDirectory()) {
+    throw new GradleException(
+            'CookieDough must be checked out next to BuildBattles (expected ../CookieDough).'
+    )
+}
+
+include ':CookieDough'
+project(':CookieDough').projectDir = cookieDoughDirectory

@@ -1,32 +1,87 @@
-# The number of plots in your map
-game_size: 8
+maps:
+  legacy:
+    archive: legacy-buildbattles.zip
+    waiting-spawn: [122.5, 36.0, 112.5, 0.0]
+    # Legacy used 25, but adjacent centers are only 41-43 blocks apart and the
+    # resulting build regions overlap. 19 is the largest conservative placeholder.
+    judging-height: 6.0
+    plot-half-size: 19
+    plot-up: 20
+    plot-down: 1
+    plots:
+      - [185.5, 5.5, 155.5, 135.0]
+      - [185.5, 5.5, 112.5, 90.0]
+      - [143.5, 5.5, 112.5, 45.0]
+      - [143.5, 5.5, 155.5, 135.0]
+      - [101.5, 5.5, 112.5, -45.0]
+      - [60.5, 5.5, 112.5, -90.0]
+      - [60.5, 5.5, 70.5, -45.0]
+      - [101.5, 5.5, 70.5, 0.0]
 
-# The coordinates of each plot (the center of the plot)
-plot_0: 185,5,155
-plot_1: 185,5,112
-plot_2: 143,5,112
-plot_3: 143,5,155
-plot_4: 101,5,112
-plot_5: 60,5,112
-plot_6: 60,5,70
-plot_7: 101,5,70
+game:
+  build-seconds: 300
+  judging-seconds-per-plot: 12
+  results-seconds: 10
+  reconnect-grace-seconds: 60
+  theme-candidates: 3
 
-# How wide a plot is. The player won't be able to build further than plot_size blocks from the center of the plot
-plot_size: 25
+floor:
+  cooldown-seconds: 5
+  blocks-per-tick: 300
 
-# How far up and down can the player go in his plot
-plot_up: 20
-plot_down: 1
+rewards:
+  participation-coins: 5
+  participation-xp: 20
+  victory-coins: 20
+  victory-xp: 80
 
-# Set to false if you're not me
-database_enabled: false
-proxy_enabled: false
-
-# Settings for the database
-database_address: 127.0.0.1
-database_name: Cookie
-database_user: Cookie
-database_password: Cookie
-
-# List all themes separated by ","
-themes: Farm, Summer, Camping, Volcano, Guns, House, Candle, Rabbit, Pizza, Car, Emoji, Smartphone, Candies, Birds, Skyscraper, McDonald's, Desk, Fast Food, Food, Dragon, Snowman, Restaurant, Tank, Nintendo, Mario, Clock, BasketBall, Ice Cream, Shop, Shoes, Bag,, Maze, Magic, Winter, Soccer, Airpane, Pokemon, Minions, TV, Lighthouse, Console, Simpsons, Wizard, Halloween, Skeleton, Free Style!, Pixel Art, Science, Animals, Candies, Alien, Sponge Bob, Rocket, Pyramid, Upside Down, Train, Ruins
+themes:
+  - Farm
+  - Summer
+  - Camping
+  - Volcano
+  - House
+  - Candle
+  - Rabbit
+  - Pizza
+  - Car
+  - Emoji
+  - Smartphone
+  - Candy
+  - Birds
+  - Skyscraper
+  - Desk
+  - Fast Food
+  - Dragon
+  - Snowman
+  - Restaurant
+  - Tank
+  - Nintendo
+  - Mario
+  - Clock
+  - Basketball
+  - Ice Cream
+  - Shop
+  - Shoes
+  - Maze
+  - Magic
+  - Winter
+  - Soccer
+  - Airplane
+  - Pokemon
+  - Minions
+  - Lighthouse
+  - Console
+  - Wizard
+  - Halloween
+  - Skeleton
+  - Free Style
+  - Pixel Art
+  - Science
+  - Animals
+  - Alien
+  - Rocket
+  - Pyramid
+  - Upside Down
+  - Train
+  - Ruins

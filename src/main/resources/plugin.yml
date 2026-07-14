@@ -1,27 +1,30 @@
 name: BuildBattles
-main: BuildBattles.Main
-
-version: "1.0.0"
-api: ["1.0.0"]
-
+version: '${version}'
+main: com.cookiebuild.buildbattles.BuildBattles
+api-version: '26.1.2'
 load: POSTWORLD
-author: Guillaume351
-description: Cookie Build Build Battles - for Nukkit
-
+depend: [CookieDough]
 
 commands:
-  pos:
-    description: Get your coordinates
-    usage: "/pos"
-    permission: buildbattle.account.basic
-
+  buildbattles:
+    description: Join a BuildBattles match
+    usage: /buildbattles play
+    aliases: [buildbattle, bb]
+    permission: buildbattles.play
+  bbtheme:
+    description: Vote for the BuildBattles theme while waiting
+    usage: /bbtheme <theme>
+    permission: buildbattles.play
+  bbvote:
+    description: Score the plot currently being judged
+    usage: /bbvote <1-5>
+    permission: buildbattles.play
   floor:
-    description: Set the floor of your plot. Only works when the game has started and you hold a block
-    usage: "/floor"
-    permission: buildbattle.account.basic
-
+    description: Replace your plot floor with the held safe block
+    usage: /floor
+    permission: buildbattles.play
 
 permissions:
-  buildbattle.account.basic:
-    description: "Allow the user to /pos"
+  buildbattles.play:
+    description: Play Cookie Build BuildBattles
     default: true
