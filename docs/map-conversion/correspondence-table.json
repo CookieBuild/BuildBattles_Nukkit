@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 1,
+  "sourceRuntime": "Cloudburst Nukkit 1.20.80 commit 86683f2",
+  "sourceRuntimeSha256": "30a3f18bbe1be03a3d1fc2ceaa16379ff2a513aaa0910e2fe0fb030b67ccc4c4",
+  "targetDataVersion": 1343,
+  "blockEntityIds": {
+    "Banner": "minecraft:banner",
+    "Chest": "minecraft:chest",
+    "FlowerPot": "minecraft:flower_pot",
+    "Sign": "minecraft:sign",
+    "Skull": "minecraft:skull"
+  },
+  "signText": {
+    "sourceId": "Sign",
+    "fields": ["Text1", "Text2", "Text3", "Text4"],
+    "targetFormat": "java_json_component"
+  },
+  "spatialStateRepairs": {
+    "143:0": {
+      "description": "Legacy floating wooden buttons used metadata 0 despite having one horizontal log support",
+      "expectedSupportOffset": [0, 1, 0],
+      "javaMetadataBySupportOffset": {
+        "-1,0,0": 1,
+        "0,0,-1": 3,
+        "0,0,1": 4,
+        "1,0,0": 2
+      }
+    }
+  },
+  "identityIds": [
+    1, 2, 3, 4, 5, 13, 14, 15, 17, 18, 20, 30, 31, 35, 43, 44, 45,
+    50, 51, 54, 55, 56, 58, 61, 65, 67, 68, 77, 85, 87, 88, 89,
+    98, 101, 106, 109, 133, 134, 136, 139, 140, 143, 144, 145, 159,
+    160, 162, 164, 169, 171, 172, 177, 179, 180, 181, 182, 183, 197
+  ],
+  "allowedStates": {
+    "1": [0, 1, 2, 5, 6],
+    "2": [0],
+    "3": [0, 1],
+    "4": [0],
+    "5": [0, 1, 3, 5],
+    "13": [0],
+    "14": [0],
+    "15": [0],
+    "17": [0, 1, 3, 4, 5, 8, 9, 11, 13, 15],
+    "18": [4, 5, 7, 13, 15],
+    "20": [0],
+    "30": [0],
+    "31": [1, 2],
+    "35": [0, 14],
+    "43": [3, 5],
+    "44": [0, 3, 5, 8, 11, 13],
+    "45": [0],
+    "50": [5],
+    "51": [15],
+    "54": [2, 3, 4, 5],
+    "55": [0],
+    "56": [0],
+    "58": [0],
+    "61": [4, 5],
+    "65": [2, 3, 4, 5],
+    "67": [0, 1, 2, 3, 4, 5, 6, 7],
+    "68": [3, 4],
+    "77": [2, 3, 4, 5],
+    "85": [0, 1],
+    "87": [0],
+    "88": [0],
+    "89": [0],
+    "95": [0, 8],
+    "96": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    "98": [0, 1, 2, 3],
+    "101": [0],
+    "106": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14],
+    "109": [0, 1, 2, 3, 4, 5, 6, 7],
+    "133": [0],
+    "134": [0, 1, 2, 3, 4, 5, 6, 7],
+    "136": [0, 1, 2, 3, 4, 5, 6, 7],
+    "139": [0, 7, 8],
+    "140": [15],
+    "143": [0],
+    "144": [1],
+    "145": [0, 1, 2, 3],
+    "157": [1, 5],
+    "158": [0, 1, 3, 5, 8, 9, 11, 13],
+    "159": [0, 1, 7, 8, 9, 13, 14],
+    "160": [8],
+    "162": [1],
+    "164": [0, 1, 2, 3, 4, 5, 6, 7],
+    "169": [0],
+    "171": [7, 12, 15],
+    "172": [0],
+    "177": [2, 3, 4, 5],
+    "179": [0],
+    "180": [0, 1, 2, 3, 4, 5, 6, 7],
+    "181": [0],
+    "182": [0, 8],
+    "183": [0, 1, 2, 3],
+    "197": [0, 2, 8, 9],
+    "236": [0, 8],
+    "237": [13],
+    "241": [8]
+  },
+  "states": {
+    "95:0": {
+      "javaId": 166,
+      "javaData": 0,
+      "nukkit": "invisible_bedrock",
+      "java": "barrier"
+    },
+    "95:8": {
+      "javaId": 166,
+      "javaData": 0,
+      "nukkit": "invisible_bedrock",
+      "java": "barrier"
+    },
+    "96:0": { "javaId": 96, "javaData": 0, "nukkit": "oak_trapdoor", "java": "oak_trapdoor" },
+    "96:1": { "javaId": 96, "javaData": 1, "nukkit": "oak_trapdoor", "java": "oak_trapdoor" },
+    "96:2": { "javaId": 96, "javaData": 2, "nukkit": "oak_trapdoor", "java": "oak_trapdoor" },
+    "96:3": { "javaId": 96, "javaData": 3, "nukkit": "oak_trapdoor", "java": "oak_trapdoor" },
+    "96:4": { "javaId": 96, "javaData": 8, "nukkit": "oak_trapdoor", "java": "oak_trapdoor" },
+    "96:5": { "javaId": 96, "javaData": 9, "nukkit": "oak_trapdoor", "java": "oak_trapdoor" },
+    "96:6": { "javaId": 96, "javaData": 10, "nukkit": "oak_trapdoor", "java": "oak_trapdoor" },
+    "96:7": { "javaId": 96, "javaData": 11, "nukkit": "oak_trapdoor", "java": "oak_trapdoor" },
+    "96:8": { "javaId": 96, "javaData": 4, "nukkit": "oak_trapdoor", "java": "oak_trapdoor" },
+    "96:9": { "javaId": 96, "javaData": 5, "nukkit": "oak_trapdoor", "java": "oak_trapdoor" },
+    "96:10": { "javaId": 96, "javaData": 6, "nukkit": "oak_trapdoor", "java": "oak_trapdoor" },
+    "96:11": { "javaId": 96, "javaData": 7, "nukkit": "oak_trapdoor", "java": "oak_trapdoor" },
+    "96:12": { "javaId": 96, "javaData": 12, "nukkit": "oak_trapdoor", "java": "oak_trapdoor" },
+    "96:13": { "javaId": 96, "javaData": 13, "nukkit": "oak_trapdoor", "java": "oak_trapdoor" },
+    "96:14": { "javaId": 96, "javaData": 14, "nukkit": "oak_trapdoor", "java": "oak_trapdoor" },
+    "96:15": { "javaId": 96, "javaData": 15, "nukkit": "oak_trapdoor", "java": "oak_trapdoor" }
+  },
+  "ids": {
+    "157": {
+      "javaId": 125,
+      "metadata": "same",
+      "nukkit": "double_wood_slab",
+      "java": "double_wooden_slab"
+    },
+    "158": {
+      "javaId": 126,
+      "metadata": "same",
+      "nukkit": "wood_slab",
+      "java": "wooden_slab"
+    },
+    "236": {
+      "javaId": 251,
+      "metadata": "same",
+      "nukkit": "concrete",
+      "java": "concrete"
+    },
+    "237": {
+      "javaId": 252,
+      "metadata": "same",
+      "nukkit": "concrete_powder",
+      "java": "concrete_powder"
+    },
+    "241": {
+      "javaId": 95,
+      "metadata": "same",
+      "nukkit": "stained_glass",
+      "java": "stained_glass"
+    }
+  }
+}

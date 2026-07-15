@@ -1,13 +1,17 @@
+config-version: 2
+
 maps:
   legacy:
     archive: legacy-buildbattles.zip
-    waiting-spawn: [122.5, 36.0, 112.5, 0.0]
-    # Legacy used 25, but adjacent centers are only 41-43 blocks apart and the
-    # resulting build regions overlap. 19 is the largest conservative placeholder.
+    # The legacy game used a separate lobby world. Reuse the first plot while
+    # waiting because the recovered game world has no dedicated waiting platform.
+    waiting-spawn: [185.5, 5.5, 155.5, 135.0]
     judging-height: 6.0
-    plot-half-size: 19
+    # Recovered from the deployed server config and verified against the 27x27
+    # terracotta plot floors at y=4.
+    plot-half-size: 13
     plot-up: 20
-    plot-down: 1
+    plot-down: 2
     plots:
       - [185.5, 5.5, 155.5, 135.0]
       - [185.5, 5.5, 112.5, 90.0]

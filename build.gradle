@@ -47,3 +47,18 @@ processResources {
         expand props
     }
 }
+
+def mapInstallDirectory = providers.gradleProperty('cookiebuildBuildBattlesMapInstallDir')
+        .map { rootProject.file(it) }
+        .orElse(provider {
+            new File(rootProject.projectDir.parentFile, 'Paper26_Test_Server/buildbattles_maps')
+        })
+
+tasks.register('installMaps', Copy) {
+    group = 'distribution'
+    description = 'Installs the versioned BuildBattles map archives into a Paper server.'
+    from(layout.projectDirectory.dir('maps')) {
+        include '*.zip'
+    }
+    into(mapInstallDirectory)
+}

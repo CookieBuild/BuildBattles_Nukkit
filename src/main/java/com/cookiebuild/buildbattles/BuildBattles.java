@@ -2,6 +2,7 @@ package com.cookiebuild.buildbattles;
 
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.List;
 import java.util.MissingResourceException;
 import java.util.Objects;
 import java.util.ResourceBundle;
@@ -47,6 +48,7 @@ public final class BuildBattles extends JavaPlugin {
     public void onEnable() {
         instance = this;
         saveDefaultConfig();
+        migrateConfig();
         LocaleManager.registerBundle("buildbattles_messages");
         themeKey = new NamespacedKey(this, "theme_vote");
         voteKey = new NamespacedKey(this, "plot_vote");
@@ -60,6 +62,21 @@ public final class BuildBattles extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new com.cookiebuild.buildbattles.listener.BuildBattlesListener(), this);
         registerCommands();
         if (!registerNewGame()) getLogger().warning("No game registered; NPC and Quick Play stay fail-closed.");
+    }
+
+    private void migrateConfig() {
+        int version = getConfig().getInt("config-version", 0);
+        if (version >= 2) return;
+        // Version 1 contained placeholders written before the recovered world
+        // was available. They are unsafe on existing installations because the
+        // waiting spawn is over void and the plot geometry overlaps.
+        getConfig().set("maps.legacy.waiting-spawn", List.of(185.5, 5.5, 155.5, 135.0));
+        getConfig().set("maps.legacy.plot-half-size", 13);
+        getConfig().set("maps.legacy.plot-up", 20);
+        getConfig().set("maps.legacy.plot-down", 2);
+        getConfig().set("config-version", 2);
+        saveConfig();
+        getLogger().info("Migrated recovered BuildBattles map coordinates to config version 2");
     }
 
     private void registerCommands() {
