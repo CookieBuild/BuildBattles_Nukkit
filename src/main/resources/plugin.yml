@@ -20,8 +20,8 @@ commands:
     usage: /bbvote <1-5>
     permission: buildbattles.play
   floor:
-    description: Replace your plot floor with the held safe block
-    usage: /floor
+    description: Replace your plot floor with a named or held safe block
+    usage: /floor [block]
     permission: buildbattles.play
 
 permissions:

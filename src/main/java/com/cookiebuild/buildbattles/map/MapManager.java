@@ -19,6 +19,8 @@ import org.bukkit.WorldCreator;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.generator.ChunkGenerator;
 
+import net.kyori.adventure.util.TriState;
+
 import com.cookiebuild.buildbattles.BuildBattles;
 import com.cookiebuild.cookiedough.utils.FileUtils;
 import com.cookiebuild.cookiedough.utils.ZipUtils;
@@ -120,6 +122,9 @@ public final class MapManager {
             World world = WorldCreator.ofKey(key)
                     .environment(World.Environment.NORMAL)
                     .generateStructures(false)
+                    // Waiting/plot chunks are loaded explicitly by the game. Paper's
+                    // generic spawn preparation blocked the server thread for 4–5 s.
+                    .keepSpawnLoaded(TriState.FALSE)
                     .generator(new VoidGenerator())
                     .createWorld();
             if (world == null) {

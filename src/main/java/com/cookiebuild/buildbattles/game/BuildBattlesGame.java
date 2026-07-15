@@ -3,7 +3,6 @@ package com.cookiebuild.buildbattles.game;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -56,6 +55,14 @@ import net.kyori.adventure.title.Title;
 public final class BuildBattlesGame extends Game {
     public static final String MINIGAME_KEY = "buildbattles";
 
+    public enum FloorChangeResult {
+        STARTED,
+        NOT_BUILDING,
+        UNSAFE_MATERIAL,
+        COOLDOWN,
+        UNAVAILABLE
+    }
+
     private final GameMap map;
     private final ThemeBallot themeBallot;
     private final MatchService matchService = new MatchService(null);
@@ -70,15 +77,25 @@ public final class BuildBattlesGame extends Game {
     private final Set<UUID> forfeited = new LinkedHashSet<>();
     private final Map<UUID, Long> lastFloorChange = new HashMap<>();
     private final List<BukkitTask> floorTasks = new ArrayList<>();
+    private final Object matchPersistenceLock = new Object();
 
     private BuildPhase phase = BuildPhase.WAITING;
     private VoteLedger voteLedger;
-    private Match match;
+    private volatile Match match;
+    private boolean matchStartPending;
+    private PendingMatchOutcome pendingMatchOutcome;
     private String theme;
     private int phaseSeconds;
     private int judgingPlot = -1;
     private boolean outcomePersisted;
     private boolean cleanupStarted;
+
+    private record PendingMatchOutcome(Set<UUID> winners, List<MatchService.Performance> performances) {
+        private PendingMatchOutcome {
+            winners = Set.copyOf(winners);
+            performances = List.copyOf(performances);
+        }
+    }
 
     public BuildBattlesGame() {
         super("BuildBattles");
@@ -99,7 +116,7 @@ public final class BuildBattlesGame extends Game {
 
     @Override
     public void registerANewGame() {
-        Bukkit.getScheduler().runTask(BuildBattles.getInstance(), BuildBattles::registerNewGame);
+        Bukkit.getScheduler().runTask(BuildBattles.getInstance(), BuildBattles::activateNextGame);
     }
 
     @Override
@@ -167,6 +184,7 @@ public final class BuildBattlesGame extends Game {
 
     @Override
     public void startGame() {
+        long startedAt = System.nanoTime();
         List<CookiePlayer> starters = getPlayers();
         if (starters.size() < 2 || starters.size() > map.template().capacity()) return;
         int plot = 0;
@@ -180,16 +198,59 @@ public final class BuildBattlesGame extends Game {
         theme = themeBallot.winner(ThreadLocalRandom.current());
         phase = BuildPhase.BUILDING;
         phaseSeconds = 0;
+        long rosterReadyAt = System.nanoTime();
         super.startGame();
-        try {
-            match = matchService.startMatchByPlayerIds("BuildBattles", participants);
-        } catch (RuntimeException error) {
-            match = null;
-            BuildBattles.getInstance().getLogger().severe("BuildBattles continues without match telemetry: " + error.getMessage());
-        }
+        long playersReadyAt = System.nanoTime();
+        startMatchPersistence();
         activePlayers.values().forEach(player -> player.getPlayer().showTitle(Title.title(
                 Component.text(theme, NamedTextColor.GOLD, TextDecoration.BOLD),
                 Component.text(BuildBattles.message(player.getPlayer(), "bb.build.start"), NamedTextColor.GREEN))));
+        long finishedAt = System.nanoTime();
+        BuildBattles.getInstance().getLogger().info("BuildBattles match start timing: game=" + getGameId()
+                + " roster_ms=" + elapsedMillis(startedAt, rosterReadyAt)
+                + " player_prepare_ms=" + elapsedMillis(rosterReadyAt, playersReadyAt)
+                + " telemetry_schedule_and_titles_ms=" + elapsedMillis(playersReadyAt, finishedAt)
+                + " total_ms=" + elapsedMillis(startedAt, finishedAt));
+    }
+
+    private static long elapsedMillis(long startedAt, long finishedAt) {
+        return (finishedAt - startedAt) / 1_000_000L;
+    }
+
+    private void startMatchPersistence() {
+        BuildBattles plugin = BuildBattles.getInstance();
+        if (plugin == null || !plugin.isEnabled()) return;
+        Set<UUID> playerIds = Set.copyOf(participants);
+        synchronized (matchPersistenceLock) {
+            matchStartPending = true;
+        }
+        try {
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                Match startedMatch = null;
+                try {
+                    startedMatch = matchService.startMatchByPlayerIds("BuildBattles", playerIds);
+                } catch (RuntimeException error) {
+                    plugin.getLogger().severe(
+                            "BuildBattles continues without match telemetry: " + error.getMessage());
+                }
+                PendingMatchOutcome pending;
+                synchronized (matchPersistenceLock) {
+                    match = startedMatch;
+                    matchStartPending = false;
+                    pending = pendingMatchOutcome;
+                    pendingMatchOutcome = null;
+                }
+                if (startedMatch != null && pending != null) {
+                    completePersistedMatch(plugin, startedMatch, pending);
+                }
+            });
+        } catch (RuntimeException error) {
+            synchronized (matchPersistenceLock) {
+                matchStartPending = false;
+            }
+            plugin.getLogger().severe(
+                    "Could not schedule BuildBattles match telemetry: " + error.getMessage());
+        }
     }
 
     @Override
@@ -342,32 +403,11 @@ public final class BuildBattlesGame extends Game {
         phase = BuildPhase.RESULTS;
         phaseSeconds = 0;
         judgingPlot = -1;
-        List<Integer> ranked = new ArrayList<>(playerByPlot.keySet());
-        ranked.sort(Comparator.comparingDouble((Integer plot) -> voteLedger.average(plot)).reversed()
-                .thenComparing(Comparator.comparingInt((Integer plot) -> voteLedger.voteCount(plot)).reversed())
-                .thenComparingInt(Integer::intValue));
+        BuildResultRanking.Result result = BuildResultRanking.calculate(playerByPlot, voteLedger, forfeited);
         Map<UUID, Integer> placements = new HashMap<>();
-        int placement = 0;
-        double lastRating = Double.NaN;
-        for (int index = 0; index < ranked.size(); index++) {
-            int plot = ranked.get(index);
-            double rating = voteLedger.average(plot);
-            if (index == 0 || Double.compare(rating, lastRating) != 0) placement = index + 1;
-            placements.put(playerByPlot.get(plot), placement);
-            lastRating = rating;
-        }
-        Set<UUID> winners = new LinkedHashSet<>();
-        Integer bestEligiblePlot = ranked.stream()
-                .filter(plot -> !forfeited.contains(playerByPlot.get(plot)))
-                .filter(plot -> voteLedger.voteCount(plot) > 0)
-                .findFirst().orElse(null);
-        if (bestEligiblePlot != null) {
-            double winningRating = voteLedger.average(bestEligiblePlot);
-            ranked.stream()
-                    .filter(plot -> !forfeited.contains(playerByPlot.get(plot)))
-                    .filter(plot -> Double.compare(voteLedger.average(plot), winningRating) == 0)
-                    .map(playerByPlot::get).forEach(winners::add);
-        }
+        result.entries().forEach(entry -> placements.put(entry.playerId(), entry.placement()));
+        Set<UUID> winners = result.winners();
+        Integer bestEligiblePlot = result.winningPlot();
         Location resultLocation = bestEligiblePlot == null ? map.template().waitingSpawn(map.world())
                 : map.template().judgingLocation(map.world(), bestEligiblePlot);
         for (CookiePlayer cookiePlayer : activePlayers.values()) {
@@ -379,13 +419,45 @@ public final class BuildBattlesGame extends Game {
                     Component.text(won ? BuildBattles.message(player, "bb.result.victory")
                                     : BuildBattles.message(player, "bb.result.finished"),
                             won ? NamedTextColor.GOLD : NamedTextColor.AQUA, TextDecoration.BOLD),
-                    Component.text(winners.isEmpty() ? BuildBattles.message(player, "bb.result.no_votes")
-                            : BuildBattles.message(player, "bb.result.winner", winners.stream().map(this::playerName).toList()),
+                    Component.text(resultSummary(player, result),
                             NamedTextColor.GRAY),
                     Title.Times.times(Duration.ofMillis(300), Duration.ofSeconds(3), Duration.ofMillis(500))));
+            sendRanking(player, result);
             sendReplay(player);
         }
         persistOutcome(winners, placements, false, true);
+    }
+
+    private String resultSummary(Player player, BuildResultRanking.Result result) {
+        if (result.winners().isEmpty()) {
+            return BuildBattles.message(player, "bb.result.no_votes");
+        }
+        Map<UUID, BuildResultRanking.Entry> entriesByPlayer = result.entries().stream()
+                .collect(java.util.stream.Collectors.toMap(BuildResultRanking.Entry::playerId, entry -> entry));
+        String summary = result.winners().stream().map(playerId -> {
+            BuildResultRanking.Entry entry = entriesByPlayer.get(playerId);
+            return BuildBattles.message(player, "bb.result.summary", playerName(playerId), entry.points(),
+                    entry.votes(), formatRating(entry.average()));
+        }).collect(java.util.stream.Collectors.joining(", "));
+        return BuildBattles.message(player, result.winners().size() == 1 ? "bb.result.winner" : "bb.result.tie",
+                summary);
+    }
+
+    private void sendRanking(Player player, BuildResultRanking.Result result) {
+        player.sendMessage(Component.text(BuildBattles.message(player, "bb.result.ranking"), NamedTextColor.GOLD,
+                TextDecoration.BOLD));
+        for (BuildResultRanking.Entry entry : result.entries()) {
+            String status = entry.forfeited() ? BuildBattles.message(player, "bb.result.forfeit") : "";
+            NamedTextColor color = entry.placement() == 1 && !entry.forfeited()
+                    ? NamedTextColor.GOLD : NamedTextColor.GRAY;
+            player.sendMessage(Component.text(BuildBattles.message(player, "bb.result.rank_line",
+                    entry.placement(), playerName(entry.playerId()), entry.points(), entry.votes(),
+                    formatRating(entry.average()), status), color));
+        }
+    }
+
+    private String formatRating(double rating) {
+        return String.format(java.util.Locale.ROOT, "%.2f", rating);
     }
 
     private void sendReplay(Player player) {
@@ -418,15 +490,10 @@ public final class BuildBattlesGame extends Game {
                     Map.entry("floorChanges", snapshot.floorChanges()),
                     Map.entry("interrupted", interrupted)));
         }).toList();
-        if (match != null) {
-            try {
-                matchService.completeMatchByWinnerIds(match, winners, performances);
-            } catch (RuntimeException error) {
-                BuildBattles.getInstance().getLogger().severe("Could not persist BuildBattles result: " + error.getMessage());
-            }
-        }
+        persistMatchOutcome(new PendingMatchOutcome(winners, performances));
         if (!rewards) return;
-        String sourceId = match == null ? getGameId().toString() : match.getId().toString();
+        Match persistedMatch = match;
+        String sourceId = persistedMatch == null ? getGameId().toString() : persistedMatch.getId().toString();
         for (UUID playerId : participants) {
             if (forfeited.contains(playerId)) continue;
             boolean won = winners.contains(playerId);
@@ -445,6 +512,36 @@ public final class BuildBattlesGame extends Game {
             } catch (RuntimeException error) {
                 BuildBattles.getInstance().getLogger().warning("Could not reward " + playerId + ": " + error.getMessage());
             }
+        }
+    }
+
+    private void persistMatchOutcome(PendingMatchOutcome outcome) {
+        Match persistedMatch;
+        synchronized (matchPersistenceLock) {
+            if (matchStartPending) {
+                pendingMatchOutcome = outcome;
+                return;
+            }
+            persistedMatch = match;
+        }
+        if (persistedMatch == null) return;
+        BuildBattles plugin = BuildBattles.getInstance();
+        if (plugin == null || !plugin.isEnabled()) return;
+        try {
+            Bukkit.getScheduler().runTaskAsynchronously(plugin,
+                    () -> completePersistedMatch(plugin, persistedMatch, outcome));
+        } catch (RuntimeException error) {
+            plugin.getLogger().severe(
+                    "Could not schedule BuildBattles result persistence: " + error.getMessage());
+        }
+    }
+
+    private void completePersistedMatch(BuildBattles plugin, Match persistedMatch, PendingMatchOutcome outcome) {
+        try {
+            matchService.completeMatchByWinnerIds(persistedMatch, outcome.winners(), outcome.performances());
+        } catch (RuntimeException error) {
+            plugin.getLogger().severe(
+                    "Could not persist BuildBattles result: " + error.getMessage());
         }
     }
 
@@ -471,15 +568,21 @@ public final class BuildBattlesGame extends Game {
     public void recordPlaced(Player player) { stats.placed(player.getUniqueId()); }
     public void recordBroken(Player player) { stats.broken(player.getUniqueId()); }
 
-    public boolean changeFloor(Player player, Material material) {
-        if (!isParticipant(player.getUniqueId()) || phase != BuildPhase.BUILDING
-                || material == null || !material.isBlock() || !material.isItem()
-                || !BuildSafetyPolicy.isSafeBuildingBlock(material)) return false;
+    public FloorChangeResult changeFloor(Player player, Material material) {
+        if (!isParticipant(player.getUniqueId()) || phase != BuildPhase.BUILDING) {
+            return FloorChangeResult.NOT_BUILDING;
+        }
+        if (material == null || !material.isBlock() || !material.isItem()
+                || !BuildSafetyPolicy.isSafeBuildingBlock(material)) {
+            return FloorChangeResult.UNSAFE_MATERIAL;
+        }
         long now = System.currentTimeMillis();
         long cooldown = BuildBattles.getInstance().getConfig().getLong("floor.cooldown-seconds", 5) * 1000L;
-        if (now - lastFloorChange.getOrDefault(player.getUniqueId(), 0L) < cooldown) return false;
+        if (now - lastFloorChange.getOrDefault(player.getUniqueId(), 0L) < cooldown) {
+            return FloorChangeResult.COOLDOWN;
+        }
         Integer plot = plotByPlayer.get(player.getUniqueId());
-        if (plot == null) return false;
+        if (plot == null) return FloorChangeResult.UNAVAILABLE;
         lastFloorChange.put(player.getUniqueId(), now);
         stats.floorChanged(player.getUniqueId());
         PlotBounds bounds = map.template().bounds(plot);
@@ -503,7 +606,7 @@ public final class BuildBattlesGame extends Game {
             }
         };
         floorTasks.add(task.runTaskTimer(BuildBattles.getInstance(), 0L, 1L));
-        return true;
+        return FloorChangeResult.STARTED;
     }
 
     public void keepInsidePlot(Player player, Location destination) {
@@ -642,6 +745,7 @@ public final class BuildBattlesGame extends Game {
         scoreboard.clear();
         stats.clear();
         GameManager.removeGame(this);
+        BuildBattles.requestStandbyRefill();
     }
 
     private void cancelFloorTasks() {

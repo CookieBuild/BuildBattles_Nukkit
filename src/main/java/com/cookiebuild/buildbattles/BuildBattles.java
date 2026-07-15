@@ -1,6 +1,8 @@
 package com.cookiebuild.buildbattles;
 
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Locale;
 import java.util.List;
 import java.util.MissingResourceException;
@@ -15,6 +17,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.cookiebuild.buildbattles.game.BuildBattlesGame;
+import com.cookiebuild.buildbattles.game.FloorMaterialResolver;
 import com.cookiebuild.buildbattles.map.MapManager;
 import com.cookiebuild.buildbattles.security.BuildSafetyPolicy;
 import com.cookiebuild.cookiedough.CookieDough;
@@ -26,9 +29,13 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 
 public final class BuildBattles extends JavaPlugin {
+    private static final int STANDBY_GAME_TARGET = 2;
     private static BuildBattles instance;
     private NamespacedKey themeKey;
     private NamespacedKey voteKey;
+    private final Deque<BuildBattlesGame> standbyGames = new ArrayDeque<>();
+    private boolean standbyRefillScheduled;
+    private boolean shuttingDown;
 
     public static BuildBattles getInstance() { return instance; }
 
@@ -42,6 +49,54 @@ public final class BuildBattles extends JavaPlugin {
             instance.getLogger().warning("BuildBattles unavailable until a valid map archive is installed: " + error.getMessage());
             return false;
         }
+    }
+
+    /**
+     * Promotes a world prepared during startup instead of copying and loading a
+     * new arena on the match-start tick.
+     */
+    public static void activateNextGame() {
+        if (instance == null || instance.shuttingDown) return;
+        BuildBattlesGame game = instance.standbyGames.pollFirst();
+        if (game == null) {
+            instance.getLogger().warning("No preloaded BuildBattles standby was available; loading a fallback game");
+            registerNewGame();
+            return;
+        }
+        GameManager.addGame(game);
+        instance.getLogger().info("Activated preloaded BuildBattles game " + game.getGameId()
+                + " (standby remaining=" + instance.standbyGames.size() + ")");
+    }
+
+    public static void requestStandbyRefill() {
+        if (instance == null || instance.shuttingDown || instance.standbyRefillScheduled
+                || instance.standbyGames.size() >= STANDBY_GAME_TARGET) return;
+        instance.standbyRefillScheduled = true;
+        instance.getServer().getScheduler().runTaskLater(instance, () -> {
+            if (instance == null || instance.shuttingDown) return;
+            instance.standbyRefillScheduled = false;
+            instance.preloadStandbyGames();
+        }, 20L);
+    }
+
+    private void preloadStandbyGames() {
+        while (!shuttingDown && standbyGames.size() < STANDBY_GAME_TARGET) {
+            long startedAt = System.nanoTime();
+            try {
+                BuildBattlesGame game = new BuildBattlesGame();
+                standbyGames.addLast(game);
+                getLogger().info("Preloaded BuildBattles standby " + game.getGameId()
+                        + " (" + standbyGames.size() + "/" + STANDBY_GAME_TARGET + ", load_ms="
+                        + elapsedMillis(startedAt) + ")");
+            } catch (RuntimeException error) {
+                getLogger().warning("Could not preload BuildBattles standby: " + error.getMessage());
+                break;
+            }
+        }
+    }
+
+    private static long elapsedMillis(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000L;
     }
 
     @Override
@@ -61,7 +116,13 @@ public final class BuildBattles extends JavaPlugin {
         }
         getServer().getPluginManager().registerEvents(new com.cookiebuild.buildbattles.listener.BuildBattlesListener(), this);
         registerCommands();
-        if (!registerNewGame()) getLogger().warning("No game registered; NPC and Quick Play stay fail-closed.");
+        if (!registerNewGame()) {
+            getLogger().warning("No game registered; NPC and Quick Play stay fail-closed.");
+        } else {
+            // Loading spare worlds before the server opens avoids the historical
+            // multi-second world-copy pause as a match begins.
+            preloadStandbyGames();
+        }
     }
 
     private void migrateConfig() {
@@ -108,15 +169,35 @@ public final class BuildBattles extends JavaPlugin {
         PluginCommand floor = Objects.requireNonNull(getCommand("floor"));
         floor.setExecutor((sender, command, label, args) -> {
             if (!(sender instanceof Player player)) return true;
-            Material material = player.getInventory().getItemInMainHand().getType();
-            BuildBattlesGame game = findGame(player);
-            if (game == null || !material.isBlock() || !material.isItem()
-                    || !BuildSafetyPolicy.isSafeBuildingBlock(material) || !game.changeFloor(player, material)) {
-                player.sendMessage(Component.text(message(player, "bb.floor.failed"), NamedTextColor.RED));
-            } else {
-                player.sendMessage(Component.text(message(player, "bb.floor.started", material.name()), NamedTextColor.GREEN));
+            Material material = FloorMaterialResolver.resolve(args, player.getInventory().getItemInMainHand().getType());
+            if (material == null) {
+                player.sendMessage(Component.text(message(player, "bb.floor.unknown", String.join(" ", args)),
+                        NamedTextColor.RED));
+                return true;
             }
+            if (!material.isBlock() || !material.isItem() || !BuildSafetyPolicy.isSafeBuildingBlock(material)) {
+                player.sendMessage(Component.text(message(player,
+                        args.length == 0 ? "bb.floor.select" : "bb.floor.unsafe", material.name()),
+                        NamedTextColor.RED));
+                return true;
+            }
+            BuildBattlesGame game = findGame(player);
+            BuildBattlesGame.FloorChangeResult result = game == null
+                    ? BuildBattlesGame.FloorChangeResult.UNAVAILABLE : game.changeFloor(player, material);
+            String messageKey = switch (result) {
+                case STARTED -> "bb.floor.started";
+                case NOT_BUILDING -> "bb.floor.not_building";
+                case UNSAFE_MATERIAL -> "bb.floor.unsafe";
+                case COOLDOWN -> "bb.floor.cooldown";
+                case UNAVAILABLE -> "bb.floor.unavailable";
+            };
+            player.sendMessage(Component.text(message(player, messageKey, material.name()),
+                    result == BuildBattlesGame.FloorChangeResult.STARTED ? NamedTextColor.GREEN : NamedTextColor.RED));
             return true;
+        });
+        floor.setTabCompleter((sender, command, alias, args) -> {
+            if (args.length != 1) return List.of();
+            return FloorMaterialResolver.suggestions(args[0]);
         });
     }
 
@@ -135,6 +216,8 @@ public final class BuildBattles extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        shuttingDown = true;
+        standbyGames.clear();
         for (Game game : new ArrayList<>(GameManager.getGames())) {
             if (game instanceof BuildBattlesGame buildGame) buildGame.shutdown();
         }

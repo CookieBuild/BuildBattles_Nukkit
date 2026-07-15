@@ -9,6 +9,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockBurnEvent;
 import org.bukkit.event.block.BlockFromToEvent;
@@ -89,11 +90,12 @@ public final class BuildBattlesListener implements Listener {
                 && event.getFrom().getBlockZ() == event.getTo().getBlockZ();
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onInteract(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND || event.getItem() == null || !event.getItem().hasItemMeta()) return;
         var data = event.getItem().getItemMeta().getPersistentDataContainer();
         if (data.has(BuildBattles.getInstance().getThemeKey(), PersistentDataType.STRING)) {
+            if (!isVoteUseAction(event.getAction())) return;
             event.setCancelled(true);
             String theme = data.get(BuildBattles.getInstance().getThemeKey(), PersistentDataType.STRING);
             BuildBattlesGame themeGame = BuildBattles.findGame(event.getPlayer());
@@ -103,6 +105,7 @@ public final class BuildBattlesListener implements Listener {
             return;
         }
         if (data.has(BuildBattles.getInstance().getVoteKey(), PersistentDataType.INTEGER)) {
+            if (!isVoteUseAction(event.getAction())) return;
             event.setCancelled(true);
             Integer score = data.get(BuildBattles.getInstance().getVoteKey(), PersistentDataType.INTEGER);
             BuildBattlesGame game = BuildBattles.findGame(event.getPlayer());
@@ -115,6 +118,10 @@ public final class BuildBattlesListener implements Listener {
                 || !BuildSafetyPolicy.isSafeBuildingBlock(event.getItem().getType()))) {
             event.setCancelled(true);
         }
+    }
+
+    static boolean isVoteUseAction(Action action) {
+        return action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
