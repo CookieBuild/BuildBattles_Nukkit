@@ -20,6 +20,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.generator.ChunkGenerator;
 
 import net.kyori.adventure.util.TriState;
+import io.papermc.paper.math.Position;
 
 import com.cookiebuild.buildbattles.BuildBattles;
 import com.cookiebuild.cookiedough.utils.FileUtils;
@@ -119,9 +120,15 @@ public final class MapManager {
             Files.deleteIfExists(destination.toPath().resolve("session.lock"));
             Files.deleteIfExists(destination.toPath().resolve("uid.dat"));
             validateArchive(destination.toPath());
+            org.bukkit.Location forcedSpawn = template.waitingSpawn(null);
             World world = WorldCreator.ofKey(key)
                     .environment(World.Environment.NORMAL)
                     .generateStructures(false)
+                    // Recovered archives do not consistently contain a usable
+                    // SpawnX/Y/Z. Avoid Paper's multi-second safe-spawn scan.
+                    .forcedSpawnPosition(Position.block(
+                            forcedSpawn.getBlockX(), forcedSpawn.getBlockY(), forcedSpawn.getBlockZ()),
+                            forcedSpawn.getYaw(), forcedSpawn.getPitch())
                     // Waiting/plot chunks are loaded explicitly by the game. Paper's
                     // generic spawn preparation blocked the server thread for 4–5 s.
                     .keepSpawnLoaded(TriState.FALSE)
