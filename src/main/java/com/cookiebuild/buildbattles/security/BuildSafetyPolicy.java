@@ -44,4 +44,13 @@ public final class BuildSafetyPolicy {
                 && !material.name().endsWith("_SPAWN_EGG")
                 && !material.name().endsWith("_BUCKET");
     }
+
+    /**
+     * Lava is useful for themes such as volcano, but other bucket contents remain
+     * disabled. Placement bounds and fluid propagation are enforced separately by
+     * the game listener.
+     */
+    public static boolean isAllowedPlotBucket(Material material) {
+        return material == Material.LAVA_BUCKET;
+    }
 }

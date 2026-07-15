@@ -169,7 +169,11 @@ public final class BuildBattlesListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onFlow(BlockFromToEvent event) {
-        if (BuildBattles.findWorldGame(event.getBlock().getWorld()) != null) event.setCancelled(true);
+        BuildBattlesGame game = BuildBattles.findWorldGame(event.getBlock().getWorld());
+        if (game != null && !game.canFluidFlow(
+                event.getBlock().getLocation(), event.getToBlock().getLocation())) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -199,12 +203,30 @@ public final class BuildBattlesListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onBucketEmpty(PlayerBucketEmptyEvent event) {
-        if (BuildBattles.findWorldGame(event.getBlock().getWorld()) != null) event.setCancelled(true);
+        BuildBattlesGame worldGame = BuildBattles.findWorldGame(event.getBlock().getWorld());
+        if (worldGame == null) return;
+        BuildBattlesGame game = BuildBattles.findGame(event.getPlayer());
+        var destination = event.getBlockClicked().getRelative(event.getBlockFace()).getLocation();
+        if (game != worldGame || !BuildSafetyPolicy.isAllowedPlotBucket(event.getBucket())
+                || !game.isInsideOwnPlot(event.getPlayer(), destination)) {
+            event.setCancelled(true);
+            event.getPlayer().sendMessage(BuildBattles.message(event.getPlayer(), "bb.build.blocked"));
+            return;
+        }
+        game.recordPlaced(event.getPlayer());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onBucketFill(PlayerBucketFillEvent event) {
-        if (BuildBattles.findWorldGame(event.getBlock().getWorld()) != null) event.setCancelled(true);
+        BuildBattlesGame worldGame = BuildBattles.findWorldGame(event.getBlock().getWorld());
+        if (worldGame == null) return;
+        BuildBattlesGame game = BuildBattles.findGame(event.getPlayer());
+        if (game != worldGame || event.getBlock().getType() != Material.LAVA
+                || !game.isInsideOwnPlot(event.getPlayer(), event.getBlock().getLocation())) {
+            event.setCancelled(true);
+            return;
+        }
+        game.recordBroken(event.getPlayer());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

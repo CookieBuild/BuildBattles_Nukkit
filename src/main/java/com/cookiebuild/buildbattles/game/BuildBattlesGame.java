@@ -32,6 +32,7 @@ import com.cookiebuild.buildbattles.map.MapManager;
 import com.cookiebuild.buildbattles.map.MapTemplate;
 import com.cookiebuild.buildbattles.map.PlotBounds;
 import com.cookiebuild.buildbattles.security.BuildSafetyPolicy;
+import com.cookiebuild.buildbattles.security.FluidSafetyPolicy;
 import com.cookiebuild.cookiedough.CookieDough;
 import com.cookiebuild.cookiedough.game.FunnelTelemetry;
 import com.cookiebuild.cookiedough.game.Game;
@@ -563,6 +564,19 @@ public final class BuildBattlesGame extends Game {
         Integer plot = plotByPlayer.get(player.getUniqueId());
         return phase == BuildPhase.BUILDING && plot != null && location != null && owns(location.getWorld())
                 && map.template().bounds(plot).contains(location.getX(), location.getY(), location.getZ());
+    }
+
+    public boolean canFluidFlow(Location source, Location destination) {
+        if (phase != BuildPhase.BUILDING || source == null || destination == null
+                || !owns(source.getWorld()) || !owns(destination.getWorld())) {
+            return false;
+        }
+        List<PlotBounds> assignedPlots = playerByPlot.keySet().stream()
+                .map(map.template()::bounds)
+                .toList();
+        return FluidSafetyPolicy.staysWithinSinglePlot(assignedPlots,
+                source.getX(), source.getY(), source.getZ(),
+                destination.getX(), destination.getY(), destination.getZ());
     }
 
     public void recordPlaced(Player player) { stats.placed(player.getUniqueId()); }
