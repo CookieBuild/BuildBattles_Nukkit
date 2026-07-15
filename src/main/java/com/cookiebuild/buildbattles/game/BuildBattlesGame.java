@@ -124,6 +124,8 @@ public final class BuildBattlesGame extends Game {
     private void prepareWaitingPlayer(CookiePlayer cookiePlayer) {
         Player player = cookiePlayer.getPlayer();
         cookiePlayer.resetPlayer();
+        player.setGameMode(GameMode.ADVENTURE);
+        player.setAllowFlight(false);
         player.teleport(map.template().waitingSpawn(map.world()));
         for (int index = 0; index < themeBallot.candidates().size(); index++) {
             String candidate = themeBallot.candidates().get(index);
@@ -136,6 +138,12 @@ public final class BuildBattlesGame extends Game {
             paper.setItemMeta(meta);
             player.getInventory().setItem(index, paper);
         }
+        player.showTitle(Title.title(
+                Component.text(BuildBattles.message(player, "bb.waiting.title"), NamedTextColor.GOLD,
+                        TextDecoration.BOLD),
+                Component.text(BuildBattles.message(player, "bb.waiting.subtitle"), NamedTextColor.YELLOW),
+                Title.Times.times(Duration.ofMillis(250), Duration.ofSeconds(3), Duration.ofMillis(500))));
+        player.sendMessage(Component.text(BuildBattles.message(player, "bb.waiting.area"), NamedTextColor.AQUA));
         player.sendMessage(themePrompt(player));
     }
 
@@ -233,16 +241,32 @@ public final class BuildBattlesGame extends Game {
             Player player = cookiePlayer.getPlayer();
             if (!player.isOnline()) continue;
             String phaseName = BuildBattles.message(player, "bb.phase." + phase.name().toLowerCase());
-            player.sendActionBar(Component.text(theme == null ? phaseName : theme + " · " + phaseName + " · " + remaining + "s",
-                    NamedTextColor.YELLOW));
+            if (phase == BuildPhase.WAITING) {
+                WaitingStatus waiting = WaitingStatus.from(getPlayers().size(), getCapacity(), getMinimumPlayers(),
+                        getStartTimer(), inQuickStart ? QUICK_START_DELAY_SECONDS : START_DELAY_SECONDS);
+                String status = waiting.isCountingDown()
+                        ? BuildBattles.message(player, "bb.waiting.starting", waiting.secondsRemaining(),
+                                waiting.players(), waiting.capacity())
+                        : BuildBattles.message(player, "bb.waiting.players", waiting.players(), waiting.capacity(),
+                                waiting.morePlayersNeeded());
+                player.sendActionBar(Component.text(status, waiting.isCountingDown()
+                        ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+            } else {
+                player.sendActionBar(Component.text(theme + " · " + phaseName + " · " + remaining + "s",
+                        NamedTextColor.YELLOW));
+            }
             BuildStats.Snapshot snapshot = stats.snapshot(player.getUniqueId());
             scoreboard.update(player, List.of(
-                    "§6Theme: §f" + (theme == null ? "Voting" : theme),
+                    "§6Theme: §f" + (theme == null ? BuildBattles.message(player, "bb.theme.voting") : theme),
                     "§6Phase: §f" + phaseName,
                     " ",
-                    "§6Time: §f" + String.format("%d:%02d", remaining / 60, remaining % 60),
+                    phase == BuildPhase.WAITING
+                            ? "§6Players: §f" + getPlayers().size() + "/" + getCapacity()
+                            : "§6Time: §f" + String.format("%d:%02d", remaining / 60, remaining % 60),
                     "§6Blocks: §a" + snapshot.blocksPlaced(),
-                    judgingPlot >= 0 ? "§6Plot: §f" + (judgingPlot + 1) + "/" + playerByPlot.size() : "§7/floor changes the floor"));
+                    phase == BuildPhase.WAITING ? "§b" + BuildBattles.message(player, "bb.waiting.area_short")
+                            : judgingPlot >= 0 ? "§6Plot: §f" + (judgingPlot + 1) + "/" + playerByPlot.size()
+                                    : "§7/floor changes the floor"));
         }
     }
 

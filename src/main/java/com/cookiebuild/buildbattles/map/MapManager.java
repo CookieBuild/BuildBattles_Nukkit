@@ -221,6 +221,19 @@ public final class MapManager {
                         + center.getBlockX() + "," + center.getBlockY() + "," + center.getBlockZ());
             }
         }
+        org.bukkit.Location waiting = template.waitingSpawn(world);
+        boolean safeWaiting = false;
+        for (int offset = 1; offset <= 5; offset++) {
+            if (world.getBlockAt(waiting.getBlockX(), waiting.getBlockY() - offset, waiting.getBlockZ())
+                    .getType().isSolid()) {
+                safeWaiting = true;
+                break;
+            }
+        }
+        if (!safeWaiting) {
+            throw new IOException("No solid terrain below configured waiting spawn "
+                    + waiting.getBlockX() + "," + waiting.getBlockY() + "," + waiting.getBlockZ());
+        }
     }
 
     private static File worldDirectory(NamespacedKey key) throws IOException {

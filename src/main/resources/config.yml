@@ -3,8 +3,8 @@ config-version: 2
 maps:
   legacy:
     archive: legacy-buildbattles.zip
-    # The legacy game used a separate lobby world. Reuse the first plot while
-    # waiting because the recovered game world has no dedicated waiting platform.
+    # The legacy separate lobby world is still missing. This temporary waiting
+    # area reuses the first plot and is explicitly labelled in-game.
     waiting-spawn: [185.5, 5.5, 155.5, 135.0]
     judging-height: 6.0
     # Recovered from the deployed server config and verified against the 27x27
