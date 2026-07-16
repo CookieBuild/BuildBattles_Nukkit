@@ -67,13 +67,14 @@ public final class BuildBattles extends JavaPlugin {
         BuildBattlesGame game = instance.standbyGames.poll();
         if (game == null) {
             instance.getLogger().warning("No preloaded BuildBattles standby is available; "
-                    + "the next arena will be prepared once gameplay is idle");
+                    + "a one-arena recovery refill has been scheduled");
             requestStandbyRefill();
             return;
         }
         GameManager.addGame(game);
         instance.getLogger().info("Activated preloaded BuildBattles game " + game.getGameId()
                 + " (standby remaining=" + instance.standbyGames.size() + ")");
+        requestStandbyRefill();
     }
 
     public static void requestStandbyRefill() {
@@ -83,18 +84,24 @@ public final class BuildBattles extends JavaPlugin {
         instance.getServer().getScheduler().runTaskLater(instance, () -> {
             if (instance == null || instance.shuttingDown) return;
             instance.standbyRefillScheduled = false;
-            if (!instance.isSafeToRefill()) {
+            int refillBatchSize = instance.runtimeRefillBatchSize();
+            if (refillBatchSize == 0) {
                 requestStandbyRefill();
                 return;
             }
-            instance.preloadStandbyGames();
+            instance.preloadStandbyGames(refillBatchSize);
             instance.activatePreparedGameIfMissing();
             if (instance.standbyGames.needsRefill()) requestStandbyRefill();
         }, STANDBY_REFILL_RETRY_TICKS);
     }
 
     private void preloadStandbyGames() {
-        while (!shuttingDown && standbyGames.needsRefill()) {
+        preloadStandbyGames(STANDBY_GAME_TARGET);
+    }
+
+    private void preloadStandbyGames(int maxGames) {
+        int loadedGames = 0;
+        while (!shuttingDown && standbyGames.needsRefill() && loadedGames < maxGames) {
             long startedAt = System.nanoTime();
             try {
                 BuildBattlesGame game = new BuildBattlesGame();
@@ -105,6 +112,7 @@ public final class BuildBattles extends JavaPlugin {
                 getLogger().info("Preloaded BuildBattles standby " + game.getGameId()
                         + " (" + standbyGames.size() + "/" + standbyGames.targetSize() + ", load_ms="
                         + elapsedMillis(startedAt) + ")");
+                loadedGames++;
             } catch (RuntimeException error) {
                 getLogger().warning("Could not preload BuildBattles standby: " + error.getMessage());
                 break;
@@ -112,11 +120,13 @@ public final class BuildBattles extends JavaPlugin {
         }
     }
 
-    private boolean isSafeToRefill() {
+    private int runtimeRefillBatchSize() {
         boolean activeGameplay = GameManager.getGames().stream().anyMatch(game -> !game.getPlayers().isEmpty()
                 || game.getState() == GameState.STARTING
                 || game.getState() == GameState.RUNNING);
-        return standbyRefillGate.canRefill(!Bukkit.getOnlinePlayers().isEmpty(), activeGameplay);
+        boolean quietWindowReady = standbyRefillGate.canRefill(!Bukkit.getOnlinePlayers().isEmpty(), activeGameplay);
+        return StandbyRefillPolicy.runtimeBatchSize(
+                standbyGames.size(), standbyGames.targetSize(), quietWindowReady);
     }
 
     private void activatePreparedGameIfMissing() {
