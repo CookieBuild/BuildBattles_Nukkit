@@ -1,4 +1,4 @@
-config-version: 2
+config-version: 3
 
 maps:
   legacy:
@@ -32,6 +32,19 @@ game:
 floor:
   cooldown-seconds: 5
   blocks-per-tick: 300
+
+safety:
+  # All limits are scoped to one player's plot. With eight players this keeps
+  # the arena below 128 player-created entities and 512 redstone components.
+  max-entities-per-player: 16
+  max-decoration-entities-per-player: 12
+  max-armor-stands-per-player: 4
+  max-living-entities-per-player: 4
+  max-villagers-per-player: 2
+  max-redstone-components-per-player: 64
+  max-lava-sources-per-player: 8
+  max-redstone-updates-per-second: 128
+  redstone-cooldown-seconds: 5
 
 rewards:
   participation-coins: 5

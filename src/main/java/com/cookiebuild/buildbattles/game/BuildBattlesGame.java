@@ -19,12 +19,17 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.BoundingBox;
 
 import com.cookiebuild.buildbattles.BuildBattles;
 import com.cookiebuild.buildbattles.map.GameMap;
@@ -32,7 +37,12 @@ import com.cookiebuild.buildbattles.map.MapManager;
 import com.cookiebuild.buildbattles.map.MapTemplate;
 import com.cookiebuild.buildbattles.map.PlotBounds;
 import com.cookiebuild.buildbattles.security.BuildSafetyPolicy;
+import com.cookiebuild.buildbattles.security.BuildResourceBudget;
+import com.cookiebuild.buildbattles.security.BuildResourceBudget.AddResult;
+import com.cookiebuild.buildbattles.security.BuildResourceBudget.BlockKey;
+import com.cookiebuild.buildbattles.security.BuildResourceBudget.EntityCategory;
 import com.cookiebuild.buildbattles.security.FluidSafetyPolicy;
+import com.cookiebuild.buildbattles.security.RedstoneActivityLimiter;
 import com.cookiebuild.cookiedough.CookieDough;
 import com.cookiebuild.cookiedough.game.FunnelTelemetry;
 import com.cookiebuild.cookiedough.game.Game;
@@ -69,6 +79,8 @@ public final class BuildBattlesGame extends Game {
     private final MatchService matchService = new MatchService(null);
     private final MinigameProgressionService progression = CookieDough.createMinigameProgressionService();
     private final BuildStats stats = new BuildStats();
+    private final BuildResourceBudget resources = createResourceBudget();
+    private final RedstoneActivityLimiter redstoneLimiter = createRedstoneLimiter();
     private final BuildBattlesScoreboard scoreboard = new BuildBattlesScoreboard();
     private final Set<UUID> participants = new LinkedHashSet<>();
     private final Map<UUID, CookiePlayer> activePlayers = new LinkedHashMap<>();
@@ -113,6 +125,25 @@ public final class BuildBattlesGame extends Game {
         } catch (IOException | RuntimeException error) {
             throw new IllegalStateException("BuildBattles preparation failed: " + error.getMessage(), error);
         }
+    }
+
+    private static BuildResourceBudget createResourceBudget() {
+        var config = BuildBattles.getInstance().getConfig();
+        return new BuildResourceBudget(
+                config.getInt("safety.max-entities-per-player", 16),
+                config.getInt("safety.max-decoration-entities-per-player", 12),
+                config.getInt("safety.max-armor-stands-per-player", 4),
+                config.getInt("safety.max-living-entities-per-player", 4),
+                config.getInt("safety.max-villagers-per-player", 2),
+                config.getInt("safety.max-redstone-components-per-player", 64),
+                config.getInt("safety.max-lava-sources-per-player", 8));
+    }
+
+    private static RedstoneActivityLimiter createRedstoneLimiter() {
+        var config = BuildBattles.getInstance().getConfig();
+        return new RedstoneActivityLimiter(
+                config.getInt("safety.max-redstone-updates-per-second", 128),
+                config.getLong("safety.redstone-cooldown-seconds", 5) * 1_000L);
     }
 
     @Override
@@ -269,6 +300,7 @@ public final class BuildBattlesGame extends Game {
         player.setAllowFlight(true);
         player.teleport(map.template().plotCenter(map.world(), plot));
         player.sendMessage(Component.text(BuildBattles.message(player, "bb.floor.hint"), NamedTextColor.YELLOW));
+        player.sendMessage(Component.text(BuildBattles.message(player, "bb.build.palette"), NamedTextColor.AQUA));
     }
 
     @Override
@@ -566,6 +598,114 @@ public final class BuildBattlesGame extends Game {
                 && map.template().bounds(plot).contains(location.getX(), location.getY(), location.getZ());
     }
 
+    public boolean isInsideOwnPlot(Player player, Entity entity) {
+        if (entity == null || !owns(entity.getWorld())) return false;
+        Integer plot = plotByPlayer.get(player.getUniqueId());
+        if (phase != BuildPhase.BUILDING || plot == null) return false;
+        PlotBounds bounds = map.template().bounds(plot);
+        BoundingBox box = entity.getBoundingBox();
+        return bounds.contains(box.getMinX(), box.getMinY(), box.getMinZ())
+                && bounds.contains(box.getMaxX(), box.getMaxY(), box.getMaxZ());
+    }
+
+    public UUID plotOwner(Location location) {
+        if (location == null || !owns(location.getWorld())) return null;
+        for (Map.Entry<Integer, UUID> entry : playerByPlot.entrySet()) {
+            if (map.template().bounds(entry.getKey()).contains(
+                    location.getX(), location.getY(), location.getZ())) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    public AddResult trackBuildEntity(Player player, Entity entity, EntityCategory category) {
+        if (!isInsideOwnPlot(player, entity)) return AddResult.TOTAL_LIMIT;
+        boolean villager = entity.getType() == EntityType.VILLAGER;
+        AddResult result = resources.tryAddEntity(
+                player.getUniqueId(), entity.getUniqueId(), category, villager);
+        if (!result.accepted()) return result;
+        entity.getPersistentDataContainer().set(BuildBattles.getInstance().getEntityOwnerKey(),
+                PersistentDataType.STRING, player.getUniqueId().toString());
+        entity.getPersistentDataContainer().set(BuildBattles.getInstance().getEntityCategoryKey(),
+                PersistentDataType.STRING, category.name());
+        configureBuildEntity(entity);
+        return result;
+    }
+
+    private void configureBuildEntity(Entity entity) {
+        entity.setPersistent(true);
+        entity.setSilent(true);
+        entity.setGravity(false);
+        if (entity instanceof LivingEntity living) {
+            living.setAI(false);
+            living.setCollidable(false);
+            living.setCanPickupItems(false);
+            living.setRemoveWhenFarAway(false);
+        }
+        if (entity instanceof Mob mob) mob.setAware(false);
+    }
+
+    public UUID buildEntityOwner(Entity entity) {
+        return entity == null ? null : resources.entityOwner(entity.getUniqueId());
+    }
+
+    public EntityCategory buildEntityCategory(Entity entity) {
+        return entity == null ? null : resources.entityCategory(entity.getUniqueId());
+    }
+
+    public boolean canEditBuildEntity(Player player, Entity entity) {
+        UUID owner = buildEntityOwner(entity);
+        return phase == BuildPhase.BUILDING && owner != null
+                && owner.equals(player.getUniqueId()) && isInsideOwnPlot(player, entity);
+    }
+
+    public void releaseBuildEntity(Entity entity) {
+        if (entity != null) resources.removeEntity(entity.getUniqueId());
+    }
+
+    public boolean reserveRedstone(Player player, Location location) {
+        pruneTrackedBlocks();
+        return phase == BuildPhase.BUILDING && isInsideOwnPlot(player, location)
+                && resources.tryAddRedstone(player.getUniqueId(), blockKey(location));
+    }
+
+    public void releaseRedstone(Location location) {
+        if (location != null && owns(location.getWorld())) resources.removeRedstone(blockKey(location));
+    }
+
+    public boolean reserveLavaSource(Player player, Location location) {
+        pruneTrackedBlocks();
+        return phase == BuildPhase.BUILDING && isInsideOwnPlot(player, location)
+                && resources.tryAddLavaSource(player.getUniqueId(), blockKey(location));
+    }
+
+    public void releaseLavaSource(Location location) {
+        if (location != null && owns(location.getWorld())) resources.removeLavaSource(blockKey(location));
+    }
+
+    private void pruneTrackedBlocks() {
+        resources.pruneRedstone(block -> {
+            World world = Bukkit.getWorld(block.worldId());
+            return world != null && BuildSafetyPolicy.isRedstoneComponent(
+                    world.getBlockAt(block.x(), block.y(), block.z()).getType());
+        });
+        resources.pruneLavaSources(block -> {
+            World world = Bukkit.getWorld(block.worldId());
+            return world != null && world.getBlockAt(block.x(), block.y(), block.z()).getType() == Material.LAVA;
+        });
+    }
+
+    public RedstoneActivityLimiter.Decision recordRedstoneUpdate(UUID owner, long nowMillis) {
+        return owner == null ? RedstoneActivityLimiter.Decision.BLOCKED
+                : redstoneLimiter.evaluate(owner, nowMillis);
+    }
+
+    private BlockKey blockKey(Location location) {
+        return new BlockKey(location.getWorld().getUID(),
+                location.getBlockX(), location.getBlockY(), location.getBlockZ());
+    }
+
     public boolean canFluidFlow(Location source, Location destination) {
         if (phase != BuildPhase.BUILDING || source == null || destination == null
                 || !owns(source.getWorld()) || !owns(destination.getWorld())) {
@@ -587,7 +727,7 @@ public final class BuildBattlesGame extends Game {
             return FloorChangeResult.NOT_BUILDING;
         }
         if (material == null || !material.isBlock() || !material.isItem()
-                || !BuildSafetyPolicy.isSafeBuildingBlock(material)) {
+                || !BuildSafetyPolicy.isSafeFloorBlock(material)) {
             return FloorChangeResult.UNSAFE_MATERIAL;
         }
         long now = System.currentTimeMillis();
@@ -733,6 +873,12 @@ public final class BuildBattlesGame extends Game {
         phase = BuildPhase.FINISHED;
         setState(GameState.FINISHED);
         cancelFloorTasks();
+        for (UUID entityId : resources.trackedEntityIds()) {
+            Entity entity = map.world().getEntity(entityId);
+            if (entity != null) entity.remove();
+        }
+        resources.clear();
+        redstoneLimiter.clear();
         for (CookiePlayer cookiePlayer : new ArrayList<>(activePlayers.values())) {
             Player player = cookiePlayer.getPlayer();
             try {

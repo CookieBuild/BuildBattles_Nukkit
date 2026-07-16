@@ -17,6 +17,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.cookiebuild.buildbattles.game.BuildBattlesGame;
+import com.cookiebuild.buildbattles.game.BuildPhase;
 import com.cookiebuild.buildbattles.game.FloorMaterialResolver;
 import com.cookiebuild.buildbattles.map.MapManager;
 import com.cookiebuild.buildbattles.security.BuildSafetyPolicy;
@@ -37,6 +38,8 @@ public final class BuildBattles extends JavaPlugin {
     private static BuildBattles instance;
     private NamespacedKey themeKey;
     private NamespacedKey voteKey;
+    private NamespacedKey entityOwnerKey;
+    private NamespacedKey entityCategoryKey;
     private final StandbyGamePool<BuildBattlesGame> standbyGames =
             new StandbyGamePool<>(STANDBY_GAME_TARGET);
     private final StandbyRefillGate standbyRefillGate =
@@ -148,6 +151,8 @@ public final class BuildBattles extends JavaPlugin {
         LocaleManager.registerBundle("buildbattles_messages");
         themeKey = new NamespacedKey(this, "theme_vote");
         voteKey = new NamespacedKey(this, "plot_vote");
+        entityOwnerKey = new NamespacedKey(this, "build_owner");
+        entityCategoryKey = new NamespacedKey(this, "build_entity_category");
         try {
             MapManager.loadTemplates();
         } catch (RuntimeException error) {
@@ -168,17 +173,32 @@ public final class BuildBattles extends JavaPlugin {
 
     private void migrateConfig() {
         int version = getConfig().getInt("config-version", 0);
-        if (version >= 2) return;
-        // Version 1 contained placeholders written before the recovered world
-        // was available. They are unsafe on existing installations because the
-        // waiting spawn is over void and the plot geometry overlaps.
-        getConfig().set("maps.legacy.waiting-spawn", List.of(185.5, 5.5, 155.5, 135.0));
-        getConfig().set("maps.legacy.plot-half-size", 13);
-        getConfig().set("maps.legacy.plot-up", 20);
-        getConfig().set("maps.legacy.plot-down", 2);
-        getConfig().set("config-version", 2);
+        if (version >= 3) return;
+        if (version < 2) {
+            // Version 1 contained placeholders written before the recovered world
+            // was available. They are unsafe on existing installations because the
+            // waiting spawn is over void and the plot geometry overlaps.
+            getConfig().set("maps.legacy.waiting-spawn", List.of(185.5, 5.5, 155.5, 135.0));
+            getConfig().set("maps.legacy.plot-half-size", 13);
+            getConfig().set("maps.legacy.plot-up", 20);
+            getConfig().set("maps.legacy.plot-down", 2);
+        }
+        setIfMissing("safety.max-entities-per-player", 16);
+        setIfMissing("safety.max-decoration-entities-per-player", 12);
+        setIfMissing("safety.max-armor-stands-per-player", 4);
+        setIfMissing("safety.max-living-entities-per-player", 4);
+        setIfMissing("safety.max-villagers-per-player", 2);
+        setIfMissing("safety.max-redstone-components-per-player", 64);
+        setIfMissing("safety.max-lava-sources-per-player", 8);
+        setIfMissing("safety.max-redstone-updates-per-second", 128);
+        setIfMissing("safety.redstone-cooldown-seconds", 5);
+        getConfig().set("config-version", 3);
         saveConfig();
-        getLogger().info("Migrated recovered BuildBattles map coordinates to config version 2");
+        getLogger().info("Migrated BuildBattles safety settings to config version 3");
+    }
+
+    private void setIfMissing(String path, Object value) {
+        if (!getConfig().isSet(path)) getConfig().set(path, value);
     }
 
     private void registerCommands() {
@@ -216,7 +236,7 @@ public final class BuildBattles extends JavaPlugin {
                         NamedTextColor.RED));
                 return true;
             }
-            if (!material.isBlock() || !material.isItem() || !BuildSafetyPolicy.isSafeBuildingBlock(material)) {
+            if (!material.isBlock() || !material.isItem() || !BuildSafetyPolicy.isSafeFloorBlock(material)) {
                 player.sendMessage(Component.text(message(player,
                         args.length == 0 ? "bb.floor.select" : "bb.floor.unsafe", material.name()),
                         NamedTextColor.RED));
@@ -239,6 +259,20 @@ public final class BuildBattles extends JavaPlugin {
         floor.setTabCompleter((sender, command, alias, args) -> {
             if (args.length != 1) return List.of();
             return FloorMaterialResolver.suggestions(args[0]);
+        });
+        Objects.requireNonNull(getCommand("bbitems")).setExecutor((sender, command, label, args) -> {
+            if (!(sender instanceof Player player)) return true;
+            BuildBattlesGame game = findGame(player);
+            if (game == null || game.getPhase() != BuildPhase.BUILDING) {
+                player.sendMessage(Component.text(message(player, "bb.items.unavailable"), NamedTextColor.RED));
+                return true;
+            }
+            for (Material material : List.of(Material.ITEM_FRAME, Material.GLOW_ITEM_FRAME,
+                    Material.ARMOR_STAND, Material.VILLAGER_SPAWN_EGG)) {
+                player.getInventory().addItem(new org.bukkit.inventory.ItemStack(material, 1));
+            }
+            player.sendMessage(Component.text(message(player, "bb.items.received"), NamedTextColor.GREEN));
+            return true;
         });
     }
 
@@ -268,6 +302,8 @@ public final class BuildBattles extends JavaPlugin {
 
     public NamespacedKey getThemeKey() { return themeKey; }
     public NamespacedKey getVoteKey() { return voteKey; }
+    public NamespacedKey getEntityOwnerKey() { return entityOwnerKey; }
+    public NamespacedKey getEntityCategoryKey() { return entityCategoryKey; }
 
     public static String message(Player player, String key, Object... arguments) {
         Locale locale = player == null ? Locale.ENGLISH : player.locale();

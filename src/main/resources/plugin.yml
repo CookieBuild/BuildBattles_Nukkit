@@ -23,6 +23,10 @@ commands:
     description: Replace your plot floor with a named or held safe block
     usage: /floor [block]
     permission: buildbattles.play
+  bbitems:
+    description: Receive the cross-play BuildBattles decoration palette
+    usage: /bbitems
+    permission: buildbattles.play
 
 permissions:
   buildbattles.play:

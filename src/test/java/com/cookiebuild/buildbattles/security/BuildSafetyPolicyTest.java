@@ -16,6 +16,33 @@ class BuildSafetyPolicyTest {
         assertFalse(BuildSafetyPolicy.isSafeBuildingBlock(Material.LAVA_BUCKET));
         assertFalse(BuildSafetyPolicy.isSafeBuildingBlock(Material.ZOMBIE_SPAWN_EGG));
         assertFalse(BuildSafetyPolicy.isSafeBuildingBlock(Material.HOPPER));
+        assertTrue(BuildSafetyPolicy.isSafeBuildingBlock(Material.REDSTONE_WIRE));
+        assertTrue(BuildSafetyPolicy.isSafeBuildingBlock(Material.REPEATER));
+        assertTrue(BuildSafetyPolicy.isSafeBuildingBlock(Material.COMPARATOR));
+        assertFalse(BuildSafetyPolicy.isSafeBuildingBlock(Material.PISTON));
+        assertFalse(BuildSafetyPolicy.isSafeBuildingBlock(Material.OBSERVER));
+        assertFalse(BuildSafetyPolicy.isSafeBuildingBlock(Material.NOTE_BLOCK));
+    }
+
+    @Test
+    void onlyAllowsExplicitPassiveSpawnEggsAndDecorations() {
+        assertTrue(BuildSafetyPolicy.isDecorationItem(Material.ITEM_FRAME));
+        assertTrue(BuildSafetyPolicy.isDecorationItem(Material.GLOW_ITEM_FRAME));
+        assertTrue(BuildSafetyPolicy.isDecorationItem(Material.ARMOR_STAND));
+        assertTrue(BuildSafetyPolicy.isSafeBuildItem(Material.VILLAGER_SPAWN_EGG));
+        assertTrue(BuildSafetyPolicy.isSafeBuildItem(Material.COW_SPAWN_EGG));
+        assertFalse(BuildSafetyPolicy.isSafeBuildItem(Material.ZOMBIE_SPAWN_EGG));
+        assertFalse(BuildSafetyPolicy.isSafeBuildItem(Material.MINECART));
+        assertFalse(BuildSafetyPolicy.isSafeBuildItem(Material.END_CRYSTAL));
+        assertTrue(BuildSafetyPolicy.isAllowedPassiveEntityName("VILLAGER"));
+        assertFalse(BuildSafetyPolicy.isAllowedPassiveEntityName("ZOMBIE"));
+    }
+
+    @Test
+    void excludesRedstoneFromBulkFloorChanges() {
+        assertTrue(BuildSafetyPolicy.isSafeFloorBlock(Material.BRICKS));
+        assertFalse(BuildSafetyPolicy.isSafeFloorBlock(Material.REDSTONE_BLOCK));
+        assertFalse(BuildSafetyPolicy.isSafeFloorBlock(Material.REDSTONE_WIRE));
     }
 
     @Test
