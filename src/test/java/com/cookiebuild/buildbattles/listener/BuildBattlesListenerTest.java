@@ -30,6 +30,14 @@ class BuildBattlesListenerTest {
     }
 
     @Test
+    void paletteShortcutUsesEitherRightClickButNeverAPlaceOrBreakClick() {
+        assertTrue(BuildBattlesListener.isPaletteShortcutUse(Action.RIGHT_CLICK_AIR));
+        assertTrue(BuildBattlesListener.isPaletteShortcutUse(Action.RIGHT_CLICK_BLOCK));
+        assertFalse(BuildBattlesListener.isPaletteShortcutUse(Action.LEFT_CLICK_AIR));
+        assertFalse(BuildBattlesListener.isPaletteShortcutUse(Action.LEFT_CLICK_BLOCK));
+    }
+
+    @Test
     void exposesDedicatedFailClosedEntityHandlers() throws Exception {
         assertTrue(BuildBattlesListener.class.getMethod("onEntityPlace", EntityPlaceEvent.class)
                 .isAnnotationPresent(EventHandler.class));

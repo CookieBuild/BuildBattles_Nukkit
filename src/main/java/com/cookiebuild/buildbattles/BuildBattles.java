@@ -14,6 +14,9 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.cookiebuild.buildbattles.game.BuildBattlesGame;
@@ -43,6 +46,7 @@ public final class BuildBattles extends JavaPlugin {
     private static BuildBattles instance;
     private NamespacedKey themeKey;
     private NamespacedKey voteKey;
+    private NamespacedKey paletteShortcutKey;
     private NamespacedKey entityOwnerKey;
     private NamespacedKey entityCategoryKey;
     private final StandbyGamePool<BuildBattlesGame> standbyGames =
@@ -156,6 +160,7 @@ public final class BuildBattles extends JavaPlugin {
         LocaleManager.registerBundle("buildbattles_messages");
         themeKey = new NamespacedKey(this, "theme_vote");
         voteKey = new NamespacedKey(this, "plot_vote");
+        paletteShortcutKey = new NamespacedKey(this, "palette_shortcut");
         entityOwnerKey = new NamespacedKey(this, "build_owner");
         entityCategoryKey = new NamespacedKey(this, "build_entity_category");
         try {
@@ -275,17 +280,32 @@ public final class BuildBattles extends JavaPlugin {
         });
         Objects.requireNonNull(getCommand("bbitems")).setExecutor((sender, command, label, args) -> {
             if (!(sender instanceof Player player)) return true;
-            BuildBattlesGame game = findGame(player);
-            if (game == null || game.getPhase() != BuildPhase.BUILDING) {
-                player.sendMessage(Component.text(message(player, "bb.items.unavailable"), NamedTextColor.RED));
-                return true;
-            }
-            for (Material material : BuildPalette.items()) {
-                player.getInventory().addItem(new org.bukkit.inventory.ItemStack(material, 1));
-            }
-            player.sendMessage(Component.text(message(player, "bb.items.received"), NamedTextColor.GREEN));
+            giveBuildPalette(player);
             return true;
         });
+    }
+
+    public static void givePaletteShortcut(Player player) {
+        if (instance == null || player == null) return;
+        ItemStack shortcut = new ItemStack(Material.CHEST);
+        ItemMeta meta = shortcut.getItemMeta();
+        meta.displayName(Component.text(message(player, "bb.palette.shortcut.name"), NamedTextColor.AQUA));
+        meta.lore(List.of(Component.text(message(player, "bb.palette.shortcut.lore"), NamedTextColor.GRAY)));
+        meta.getPersistentDataContainer().set(instance.paletteShortcutKey, PersistentDataType.BYTE, (byte) 1);
+        shortcut.setItemMeta(meta);
+        player.getInventory().setItem(8, shortcut);
+    }
+
+    public static void giveBuildPalette(Player player) {
+        BuildBattlesGame game = findGame(player);
+        if (game == null || game.getPhase() != BuildPhase.BUILDING) {
+            player.sendMessage(Component.text(message(player, "bb.items.unavailable"), NamedTextColor.RED));
+            return;
+        }
+        for (Material material : BuildPalette.items()) {
+            player.getInventory().addItem(new ItemStack(material, 1));
+        }
+        player.sendMessage(Component.text(message(player, "bb.items.received"), NamedTextColor.GREEN));
     }
 
     public static BuildBattlesGame findGame(Player player) {
@@ -314,6 +334,7 @@ public final class BuildBattles extends JavaPlugin {
 
     public NamespacedKey getThemeKey() { return themeKey; }
     public NamespacedKey getVoteKey() { return voteKey; }
+    public NamespacedKey getPaletteShortcutKey() { return paletteShortcutKey; }
     public NamespacedKey getEntityOwnerKey() { return entityOwnerKey; }
     public NamespacedKey getEntityCategoryKey() { return entityCategoryKey; }
 

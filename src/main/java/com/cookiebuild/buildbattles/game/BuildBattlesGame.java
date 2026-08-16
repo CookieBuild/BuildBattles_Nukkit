@@ -299,6 +299,7 @@ public final class BuildBattlesGame extends Game {
         player.setGameMode(GameMode.CREATIVE);
         player.setAllowFlight(true);
         player.teleport(map.template().plotCenter(map.world(), plot));
+        BuildBattles.givePaletteShortcut(player);
         player.sendMessage(Component.text(BuildBattles.message(player, "bb.floor.hint"), NamedTextColor.YELLOW));
         player.sendMessage(Component.text(BuildBattles.message(player, "bb.build.palette"), NamedTextColor.AQUA));
     }

@@ -124,6 +124,12 @@ public final class BuildBattlesListener implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         if (event.getItem() != null && event.getItem().hasItemMeta()) {
             var data = event.getItem().getItemMeta().getPersistentDataContainer();
+            if (data.has(BuildBattles.getInstance().getPaletteShortcutKey(), PersistentDataType.BYTE)) {
+                if (!isPaletteShortcutUse(event.getAction())) return;
+                event.setCancelled(true);
+                BuildBattles.giveBuildPalette(event.getPlayer());
+                return;
+            }
             if (data.has(BuildBattles.getInstance().getThemeKey(), PersistentDataType.STRING)) {
                 if (!isVoteUseAction(event.getAction())) return;
                 event.setCancelled(true);
@@ -184,6 +190,10 @@ public final class BuildBattlesListener implements Listener {
 
     static boolean isVoteUseAction(Action action) {
         return action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK;
+    }
+
+    static boolean isPaletteShortcutUse(Action action) {
+        return isVoteUseAction(action);
     }
 
     static boolean canInteractWithBuildBlock(BuildPhase phase, boolean insideOwnPlot) {
