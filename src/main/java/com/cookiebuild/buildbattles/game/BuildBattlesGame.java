@@ -65,7 +65,6 @@ import net.kyori.adventure.title.Title;
 
 public final class BuildBattlesGame extends Game {
     public static final String MINIGAME_KEY = "buildbattles";
-    static final int NORMAL_START_DELAY_SECONDS = 15;
 
     public enum FloorChangeResult {
         STARTED,
@@ -113,9 +112,7 @@ public final class BuildBattlesGame extends Game {
 
     public BuildBattlesGame() {
         super("BuildBattles");
-        // Most queue exits happen before a match starts; once two builders are
-        // present, keep the theme ballot but do not make them wait half a minute.
-        START_DELAY_SECONDS = NORMAL_START_DELAY_SECONDS;
+        START_DELAY_SECONDS = 30;
         QUICK_START_DELAY_SECONDS = 10;
         try {
             MapTemplate template = MapManager.selectAvailable();
