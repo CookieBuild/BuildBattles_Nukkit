@@ -23,10 +23,15 @@ import com.cookiebuild.buildbattles.map.MapManager;
 import com.cookiebuild.buildbattles.security.BuildSafetyPolicy;
 import com.cookiebuild.cookiedough.CookieDough;
 import com.cookiebuild.cookiedough.game.Game;
+import com.cookiebuild.cookiedough.game.FunnelTelemetry;
 import com.cookiebuild.cookiedough.game.GameManager;
 import com.cookiebuild.cookiedough.game.GameState;
 import com.cookiebuild.cookiedough.game.StandbyGamePool;
 import com.cookiebuild.cookiedough.game.StandbyRefillGate;
+import com.cookiebuild.cookiedough.lobby.LobbyManager;
+import com.cookiebuild.cookiedough.player.CookiePlayer;
+import com.cookiebuild.cookiedough.player.PlayerManager;
+import com.cookiebuild.cookiedough.player.PlayerState;
 import com.cookiebuild.cookiedough.utils.LocaleManager;
 
 import net.kyori.adventure.text.Component;
@@ -204,6 +209,14 @@ public final class BuildBattles extends JavaPlugin {
     private void registerCommands() {
         Objects.requireNonNull(getCommand("buildbattles")).setExecutor((sender, command, label, args) -> {
             if (!(sender instanceof Player player)) return true;
+            if (args.length > 0 && args[0].equalsIgnoreCase("replay")) {
+                FunnelTelemetry.record(player, FunnelTelemetry.Event.REMATCH_CLICKED, "game=BuildBattles");
+                CookiePlayer cookiePlayer = PlayerManager.getPlayer(player);
+                if (cookiePlayer != null && (cookiePlayer.getState() != PlayerState.LOBBY
+                        || GameManager.getGameOfPlayer(cookiePlayer) != null)) {
+                    LobbyManager.teleportPlayerToLobby(cookiePlayer);
+                }
+            }
             CookieDough.getInstance().getLobbyManager().requestGame(player, "BuildBattles");
             return true;
         });
@@ -267,8 +280,7 @@ public final class BuildBattles extends JavaPlugin {
                 player.sendMessage(Component.text(message(player, "bb.items.unavailable"), NamedTextColor.RED));
                 return true;
             }
-            for (Material material : List.of(Material.ITEM_FRAME, Material.GLOW_ITEM_FRAME,
-                    Material.ARMOR_STAND, Material.VILLAGER_SPAWN_EGG)) {
+            for (Material material : BuildPalette.items()) {
                 player.getInventory().addItem(new org.bukkit.inventory.ItemStack(material, 1));
             }
             player.sendMessage(Component.text(message(player, "bb.items.received"), NamedTextColor.GREEN));

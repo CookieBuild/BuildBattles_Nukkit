@@ -65,6 +65,7 @@ import net.kyori.adventure.title.Title;
 
 public final class BuildBattlesGame extends Game {
     public static final String MINIGAME_KEY = "buildbattles";
+    static final int NORMAL_START_DELAY_SECONDS = 15;
 
     public enum FloorChangeResult {
         STARTED,
@@ -112,7 +113,9 @@ public final class BuildBattlesGame extends Game {
 
     public BuildBattlesGame() {
         super("BuildBattles");
-        START_DELAY_SECONDS = 30;
+        // Most queue exits happen before a match starts; once two builders are
+        // present, keep the theme ballot but do not make them wait half a minute.
+        START_DELAY_SECONDS = NORMAL_START_DELAY_SECONDS;
         QUICK_START_DELAY_SECONDS = 10;
         try {
             MapTemplate template = MapManager.selectAvailable();
@@ -383,8 +386,6 @@ public final class BuildBattlesGame extends Game {
     }
 
     private void prepareJudgingPlot() {
-        UUID ownerId = playerByPlot.get(judgingPlot);
-        String ownerName = playerName(ownerId);
         for (CookiePlayer cookiePlayer : activePlayers.values()) {
             Player player = cookiePlayer.getPlayer();
             if (!player.isOnline()) continue;
@@ -395,7 +396,7 @@ public final class BuildBattlesGame extends Game {
             player.setFlying(true);
             player.teleport(map.template().judgingLocation(map.world(), judgingPlot));
             giveVoteItems(player);
-            player.sendMessage(Component.text(BuildBattles.message(player, "bb.judging.owner", ownerName), NamedTextColor.AQUA));
+            player.sendMessage(Component.text(BuildBattles.message(player, "bb.judging.anonymous"), NamedTextColor.AQUA));
         }
     }
 
@@ -496,8 +497,12 @@ public final class BuildBattlesGame extends Game {
     private void sendReplay(Player player) {
         FunnelTelemetry.record(player, FunnelTelemetry.Event.MATCH_COMPLETED, "game=BuildBattles");
         player.sendMessage(Component.text(BuildBattles.message(player, "bb.replay"), NamedTextColor.GREEN)
-                .clickEvent(ClickEvent.runCommand("/quickplay replay"))
-                .hoverEvent(HoverEvent.showText(Component.text("Play again"))));
+                .clickEvent(ClickEvent.runCommand(replayCommand()))
+                .hoverEvent(HoverEvent.showText(Component.text(BuildBattles.message(player, "bb.replay.hover")))));
+    }
+
+    static String replayCommand() {
+        return "/buildbattles replay";
     }
 
     private void persistOutcome(Set<UUID> winners, Map<UUID, Integer> placements,
