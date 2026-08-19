@@ -19,7 +19,6 @@ import org.bukkit.WorldCreator;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.generator.ChunkGenerator;
 
-import net.kyori.adventure.util.TriState;
 import io.papermc.paper.math.Position;
 
 import com.cookiebuild.buildbattles.BuildBattles;
@@ -129,9 +128,6 @@ public final class MapManager {
                     .forcedSpawnPosition(Position.block(
                             forcedSpawn.getBlockX(), forcedSpawn.getBlockY(), forcedSpawn.getBlockZ()),
                             forcedSpawn.getYaw(), forcedSpawn.getPitch())
-                    // Waiting/plot chunks are loaded explicitly by the game. Paper's
-                    // generic spawn preparation blocked the server thread for 4–5 s.
-                    .keepSpawnLoaded(TriState.FALSE)
                     .generator(new VoidGenerator())
                     .createWorld();
             if (world == null) {
