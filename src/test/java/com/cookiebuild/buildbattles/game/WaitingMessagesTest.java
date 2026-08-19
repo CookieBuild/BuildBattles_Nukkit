@@ -17,6 +17,6 @@ class WaitingMessagesTest {
         assertEquals("Waiting for players", bundle.getString("bb.phase.waiting"));
         assertTrue(bundle.getString("bb.waiting.players").startsWith("Waiting for players"));
         assertTrue(bundle.getString("bb.waiting.starting").startsWith("Starting in {0}s"));
-        assertTrue(bundle.getString("bb.waiting.area").contains("temporary waiting area"));
+        assertTrue(bundle.getString("bb.waiting.area").contains("Builder Briefing"));
     }
 }

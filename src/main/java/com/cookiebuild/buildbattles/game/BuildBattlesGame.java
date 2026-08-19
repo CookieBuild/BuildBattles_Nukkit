@@ -494,9 +494,7 @@ public final class BuildBattlesGame extends Game {
 
     private void sendReplay(Player player) {
         FunnelTelemetry.record(player, FunnelTelemetry.Event.MATCH_COMPLETED, "game=BuildBattles");
-        player.sendMessage(Component.text(BuildBattles.message(player, "bb.replay"), NamedTextColor.GREEN)
-                .clickEvent(ClickEvent.runCommand(replayCommand()))
-                .hoverEvent(HoverEvent.showText(Component.text(BuildBattles.message(player, "bb.replay.hover")))));
+        CookieDough.getInstance().getPlayerHubMenu().openReplay(player, "BuildBattles");
     }
 
     static String replayCommand() {
