@@ -8,32 +8,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import com.cookiebuild.cookiedough.game.StandbyGamePool;
+import com.cookiebuild.cookiedough.game.StandbyRefillPolicy;
 
 class StandbyRefillPolicyTest {
     @Test
     void recoversOneArenaWhenThePoolIsEmptyEvenWithoutAQuietWindow() {
-        assertEquals(1, StandbyRefillPolicy.runtimeBatchSize(0, 3, false));
+        assertEquals(1, StandbyRefillPolicy.runtimeBatchSize(0, 1));
     }
 
     @Test
-    void keepsNonEmergencyRefillsBehindTheQuietWindow() {
-        assertEquals(0, StandbyRefillPolicy.runtimeBatchSize(1, 3, false));
-        assertEquals(1, StandbyRefillPolicy.runtimeBatchSize(1, 3, true));
-        assertEquals(1, StandbyRefillPolicy.runtimeBatchSize(2, 3, true));
-        assertEquals(0, StandbyRefillPolicy.runtimeBatchSize(3, 3, true));
+    void keepsOnlyOnePreparedBuildBattlesArena() {
+        assertEquals(0, StandbyRefillPolicy.runtimeBatchSize(1, 1));
     }
 
     @Test
-    void rapidRematchesCannotExhaustTheInitialPool() {
-        StandbyGamePool<String> pool = new StandbyGamePool<>(3);
+    void twelveRematchesStayAvailableWithALobbyPlayerOnline() {
+        StandbyGamePool<String> pool = new StandbyGamePool<>(1);
         assertTrue(pool.offer("standby-1"));
-        assertTrue(pool.offer("standby-2"));
-        assertTrue(pool.offer("standby-3"));
 
-        for (int match = 1; match <= 6; match++) {
+        int onlineLobbyPlayers = 1;
+        assertTrue(onlineLobbyPlayers > 0);
+        for (int match = 1; match <= 12; match++) {
             assertNotNull(pool.poll(), "match " + match + " must have a replacement arena");
             int refillBatchSize = StandbyRefillPolicy.runtimeBatchSize(
-                    pool.size(), pool.targetSize(), false);
+                    pool.size(), pool.targetSize());
             if (refillBatchSize == 1) {
                 assertTrue(pool.offer("recovered-" + match));
             }
@@ -43,10 +41,10 @@ class StandbyRefillPolicyTest {
     @Test
     void rejectsImpossiblePoolSizes() {
         assertThrows(IllegalArgumentException.class,
-                () -> StandbyRefillPolicy.runtimeBatchSize(-1, 3, false));
+                () -> StandbyRefillPolicy.runtimeBatchSize(-1, 3));
         assertThrows(IllegalArgumentException.class,
-                () -> StandbyRefillPolicy.runtimeBatchSize(4, 3, false));
+                () -> StandbyRefillPolicy.runtimeBatchSize(4, 3));
         assertThrows(IllegalArgumentException.class,
-                () -> StandbyRefillPolicy.runtimeBatchSize(0, 0, false));
+                () -> StandbyRefillPolicy.runtimeBatchSize(0, 0));
     }
 }

@@ -1,15 +1,15 @@
 package com.cookiebuild.buildbattles;
 
 import java.util.ArrayList;
-import java.time.Duration;
 import java.util.Locale;
 import java.util.List;
 import java.util.MissingResourceException;
 import java.util.Objects;
 import java.util.ResourceBundle;
+import java.util.UUID;
+import java.util.concurrent.CompletionException;
 
 import org.bukkit.NamespacedKey;
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.command.PluginCommand;
@@ -29,8 +29,10 @@ import com.cookiebuild.cookiedough.game.Game;
 import com.cookiebuild.cookiedough.game.FunnelTelemetry;
 import com.cookiebuild.cookiedough.game.GameManager;
 import com.cookiebuild.cookiedough.game.GameState;
-import com.cookiebuild.cookiedough.game.StandbyGamePool;
-import com.cookiebuild.cookiedough.game.StandbyRefillGate;
+import com.cookiebuild.cookiedough.game.BukkitArenaPreparationScheduler;
+import com.cookiebuild.cookiedough.game.ArenaPreparationPipeline;
+import com.cookiebuild.cookiedough.game.StandbyArenaService;
+import com.cookiebuild.cookiedough.game.StandbyRefillPolicy;
 import com.cookiebuild.cookiedough.lobby.LobbyManager;
 import com.cookiebuild.cookiedough.player.CookiePlayer;
 import com.cookiebuild.cookiedough.player.PlayerManager;
@@ -41,33 +43,19 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 
 public final class BuildBattles extends JavaPlugin {
-    private static final int STANDBY_GAME_TARGET = 3;
-    private static final long STANDBY_REFILL_RETRY_TICKS = 20L * 5L;
     private static BuildBattles instance;
     private NamespacedKey themeKey;
     private NamespacedKey voteKey;
     private NamespacedKey paletteShortcutKey;
     private NamespacedKey entityOwnerKey;
     private NamespacedKey entityCategoryKey;
-    private final StandbyGamePool<BuildBattlesGame> standbyGames =
-            new StandbyGamePool<>(STANDBY_GAME_TARGET);
-    private final StandbyRefillGate standbyRefillGate =
-            new StandbyRefillGate(Duration.ofSeconds(30));
-    private boolean standbyRefillScheduled;
+    private StandbyArenaService<MapManager.PreparedMap, BuildBattlesGame> arenas;
     private boolean shuttingDown;
 
     public static BuildBattles getInstance() { return instance; }
 
     public static boolean registerNewGame() {
-        try {
-            BuildBattlesGame game = new BuildBattlesGame();
-            GameManager.addGame(game);
-            instance.getLogger().info("Registered BuildBattles game " + game.getGameId());
-            return true;
-        } catch (RuntimeException error) {
-            instance.getLogger().warning("BuildBattles unavailable until a valid map archive is installed: " + error.getMessage());
-            return false;
-        }
+        return instance != null && !instance.shuttingDown && instance.arenas.request(0L);
     }
 
     /**
@@ -76,80 +64,41 @@ public final class BuildBattles extends JavaPlugin {
      */
     public static void activateNextGame() {
         if (instance == null || instance.shuttingDown) return;
-        BuildBattlesGame game = instance.standbyGames.poll();
-        if (game == null) {
-            instance.getLogger().warning("No preloaded BuildBattles standby is available; "
-                    + "a one-arena recovery refill has been scheduled");
-            requestStandbyRefill();
-            return;
-        }
-        GameManager.addGame(game);
-        instance.getLogger().info("Activated preloaded BuildBattles game " + game.getGameId()
-                + " (standby remaining=" + instance.standbyGames.size() + ")");
-        requestStandbyRefill();
+        instance.arenas.activateNext();
     }
 
     public static void requestStandbyRefill() {
-        if (instance == null || instance.shuttingDown || instance.standbyRefillScheduled
-                || !instance.standbyGames.needsRefill()) return;
-        instance.standbyRefillScheduled = true;
-        instance.getServer().getScheduler().runTaskLater(instance, () -> {
-            if (instance == null || instance.shuttingDown) return;
-            instance.standbyRefillScheduled = false;
-            int refillBatchSize = instance.runtimeRefillBatchSize();
-            if (refillBatchSize == 0) {
-                requestStandbyRefill();
-                return;
-            }
-            instance.preloadStandbyGames(refillBatchSize);
-            instance.activatePreparedGameIfMissing();
-            if (instance.standbyGames.needsRefill()) requestStandbyRefill();
-        }, STANDBY_REFILL_RETRY_TICKS);
-    }
-
-    private void preloadStandbyGames() {
-        preloadStandbyGames(STANDBY_GAME_TARGET);
-    }
-
-    private void preloadStandbyGames(int maxGames) {
-        int loadedGames = 0;
-        while (!shuttingDown && standbyGames.needsRefill() && loadedGames < maxGames) {
-            long startedAt = System.nanoTime();
-            try {
-                BuildBattlesGame game = new BuildBattlesGame();
-                if (!standbyGames.offer(game)) {
-                    game.shutdown();
-                    break;
-                }
-                getLogger().info("Preloaded BuildBattles standby " + game.getGameId()
-                        + " (" + standbyGames.size() + "/" + standbyGames.targetSize() + ", load_ms="
-                        + elapsedMillis(startedAt) + ")");
-                loadedGames++;
-            } catch (RuntimeException error) {
-                getLogger().warning("Could not preload BuildBattles standby: " + error.getMessage());
-                break;
-            }
+        if (instance != null && !instance.shuttingDown) {
+            instance.arenas.request(StandbyRefillPolicy.RUNTIME_DELAY_TICKS);
         }
     }
 
-    private int runtimeRefillBatchSize() {
-        boolean activeGameplay = GameManager.getGames().stream().anyMatch(game -> !game.getPlayers().isEmpty()
-                || game.getState() == GameState.STARTING
-                || game.getState() == GameState.RUNNING);
-        boolean quietWindowReady = standbyRefillGate.canRefill(!Bukkit.getOnlinePlayers().isEmpty(), activeGameplay);
-        return StandbyRefillPolicy.runtimeBatchSize(
-                standbyGames.size(), standbyGames.targetSize(), quietWindowReady);
+    private MapManager.PreparedMap planArena() {
+        try {
+            return MapManager.plan(UUID.randomUUID(), MapManager.selectAvailable());
+        } catch (java.io.IOException error) {
+            throw new CompletionException(error);
+        }
     }
 
-    private void activatePreparedGameIfMissing() {
-        boolean hasOpenGame = GameManager.getGames().stream()
-                .filter(BuildBattlesGame.class::isInstance)
-                .anyMatch(game -> game.getState() == GameState.OPEN);
-        if (!hasOpenGame) activateNextGame();
+    private static MapManager.PreparedMap prepareArenaIo(MapManager.PreparedMap plan) {
+        try { return MapManager.prepareIo(plan); }
+        catch (java.io.IOException error) { throw new CompletionException(error); }
     }
 
-    private static long elapsedMillis(long startedAt) {
-        return (System.nanoTime() - startedAt) / 1_000_000L;
+    private static ArenaPreparationPipeline.WorldLoad<BuildBattlesGame> loadArena(
+            MapManager.PreparedMap prepared) {
+        return MapManager.loadPreparedAsync(prepared).map(map -> {
+            try {
+                return new BuildBattlesGame(prepared.gameId(), map, prepared.template());
+            } catch (RuntimeException error) {
+                if (!MapManager.discardLoadedWorld(prepared.gameId())) {
+                    BuildBattles.getInstance().getLogger().warning(
+                            "Could not unload partially constructed BuildBattles arena " + prepared.gameId());
+                }
+                throw error;
+            }
+        });
     }
 
     @Override
@@ -170,14 +119,16 @@ public final class BuildBattles extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
+        arenas = StandbyArenaService.asynchronous(
+                "BuildBattles", new BukkitArenaPreparationScheduler(this), this::planArena,
+                BuildBattles::prepareArenaIo, BuildBattles::loadArena, MapManager::discardPrepared,
+                () -> GameManager.getGames().stream().filter(BuildBattlesGame.class::isInstance)
+                        .anyMatch(game -> game.getState() == GameState.OPEN),
+                GameManager::addGame, BuildBattlesGame::shutdown, getLogger(), true);
         getServer().getPluginManager().registerEvents(new com.cookiebuild.buildbattles.listener.BuildBattlesListener(), this);
         registerCommands();
         if (!registerNewGame()) {
             getLogger().warning("No game registered; NPC and Quick Play stay fail-closed.");
-        } else {
-            // Loading spare worlds before the server opens avoids the historical
-            // multi-second world-copy pause as a match begins.
-            preloadStandbyGames();
         }
     }
 
@@ -324,7 +275,7 @@ public final class BuildBattles extends JavaPlugin {
     @Override
     public void onDisable() {
         shuttingDown = true;
-        standbyGames.drain();
+        if (arenas != null) arenas.shutdown();
         for (Game game : new ArrayList<>(GameManager.getGames())) {
             if (game instanceof BuildBattlesGame buildGame) buildGame.shutdown();
         }

@@ -1,6 +1,5 @@
 package com.cookiebuild.buildbattles.game;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -110,21 +109,16 @@ public final class BuildBattlesGame extends Game {
         }
     }
 
-    public BuildBattlesGame() {
-        super("BuildBattles");
+    public BuildBattlesGame(UUID gameId, GameMap preparedMap, MapTemplate template) {
+        super("BuildBattles", gameId);
         START_DELAY_SECONDS = 30;
         QUICK_START_DELAY_SECONDS = 10;
-        try {
-            MapTemplate template = MapManager.selectAvailable();
-            map = MapManager.load(getGameId(), template);
-            setCapacity(template.capacity());
-            List<String> themes = BuildBattles.getInstance().getConfig().getStringList("themes");
-            themeBallot = new ThemeBallot(themes,
-                    BuildBattles.getInstance().getConfig().getInt("game.theme-candidates", 3),
-                    ThreadLocalRandom.current());
-        } catch (IOException | RuntimeException error) {
-            throw new IllegalStateException("BuildBattles preparation failed: " + error.getMessage(), error);
-        }
+        map = java.util.Objects.requireNonNull(preparedMap, "preparedMap");
+        setCapacity(template.capacity());
+        List<String> themes = BuildBattles.getInstance().getConfig().getStringList("themes");
+        themeBallot = new ThemeBallot(themes,
+                BuildBattles.getInstance().getConfig().getInt("game.theme-candidates", 3),
+                ThreadLocalRandom.current());
     }
 
     private static BuildResourceBudget createResourceBudget() {
@@ -181,7 +175,8 @@ public final class BuildBattlesGame extends Game {
             ItemStack paper = new ItemStack(Material.PAPER);
             ItemMeta meta = paper.getItemMeta();
             meta.displayName(Component.text(candidate, NamedTextColor.AQUA));
-            meta.lore(List.of(Component.text("Use to vote for this theme", NamedTextColor.GRAY)));
+            meta.lore(List.of(Component.text(BuildBattles.message(
+                    player, "bb.theme.vote_item_lore"), NamedTextColor.GRAY)));
             meta.getPersistentDataContainer().set(BuildBattles.getInstance().getThemeKey(),
                     PersistentDataType.STRING, candidate);
             paper.setItemMeta(meta);
@@ -201,7 +196,8 @@ public final class BuildBattlesGame extends Game {
         for (String candidate : themeBallot.candidates()) {
             prompt = prompt.append(Component.text("[" + candidate + "] ", NamedTextColor.AQUA)
                     .clickEvent(ClickEvent.runCommand("/bbtheme " + candidate))
-                    .hoverEvent(HoverEvent.showText(Component.text("Vote " + candidate))));
+                    .hoverEvent(HoverEvent.showText(Component.text(
+                            BuildBattles.message(player, "bb.theme.vote_hover", candidate)))));
         }
         return prompt;
     }
@@ -347,22 +343,31 @@ public final class BuildBattlesGame extends Game {
                 player.sendActionBar(Component.text(status, waiting.isCountingDown()
                         ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
             } else {
-                player.sendActionBar(Component.text(theme + " · " + phaseName + " · " + remaining + "s",
+                player.sendActionBar(Component.text(BuildBattles.message(player, "bb.status.play",
+                                theme, phaseName, formatSeconds(remaining)),
                         NamedTextColor.YELLOW));
             }
             BuildStats.Snapshot snapshot = stats.snapshot(player.getUniqueId());
             scoreboard.update(player, List.of(
-                    "§6Theme: §f" + (theme == null ? BuildBattles.message(player, "bb.theme.voting") : theme),
-                    "§6Phase: §f" + phaseName,
+                    "§6" + BuildBattles.message(player, "bb.scoreboard.theme",
+                            theme == null ? BuildBattles.message(player, "bb.theme.voting") : theme),
+                    "§6" + BuildBattles.message(player, "bb.scoreboard.phase", phaseName),
                     " ",
                     phase == BuildPhase.WAITING
-                            ? "§6Players: §f" + getPlayers().size() + "/" + getCapacity()
-                            : "§6Time: §f" + String.format("%d:%02d", remaining / 60, remaining % 60),
-                    "§6Blocks: §a" + snapshot.blocksPlaced(),
+                            ? "§6" + BuildBattles.message(player, "bb.scoreboard.players",
+                                    getPlayers().size(), getCapacity())
+                            : "§6" + BuildBattles.message(player, "bb.scoreboard.time", formatSeconds(remaining)),
+                    "§6" + BuildBattles.message(player, "bb.scoreboard.blocks", snapshot.blocksPlaced()),
                     phase == BuildPhase.WAITING ? "§b" + BuildBattles.message(player, "bb.waiting.area_short")
-                            : judgingPlot >= 0 ? "§6Plot: §f" + (judgingPlot + 1) + "/" + playerByPlot.size()
-                                    : "§7/floor changes the floor"));
+                            : judgingPlot >= 0 ? "§6" + BuildBattles.message(player, "bb.scoreboard.plot",
+                                    judgingPlot + 1, playerByPlot.size())
+                                    : "§7" + BuildBattles.message(player, "bb.scoreboard.floor_hint")));
         }
+    }
+
+    private static String formatSeconds(int seconds) {
+        int safe = Math.max(0, seconds);
+        return String.format(java.util.Locale.ROOT, "%d:%02d", safe / 60, safe % 60);
     }
 
     private void startJudging() {
@@ -407,7 +412,8 @@ public final class BuildBattlesGame extends Game {
             ItemMeta meta = item.getItemMeta();
             meta.displayName(Component.text(value + "/5 · " + BuildBattles.message(player, "bb.vote." + value),
                     value >= 4 ? NamedTextColor.GREEN : value <= 2 ? NamedTextColor.RED : NamedTextColor.YELLOW));
-            meta.lore(List.of(Component.text("Use to submit your one vote", NamedTextColor.GRAY)));
+            meta.lore(List.of(Component.text(BuildBattles.message(
+                    player, "bb.vote.item_lore"), NamedTextColor.GRAY)));
             meta.getPersistentDataContainer().set(BuildBattles.getInstance().getVoteKey(), PersistentDataType.INTEGER, value);
             item.setItemMeta(meta);
             player.getInventory().setItem(index, item);
