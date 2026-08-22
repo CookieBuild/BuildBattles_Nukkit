@@ -51,6 +51,7 @@ import com.cookiebuild.buildbattles.BuildBattles;
 import com.cookiebuild.buildbattles.game.BuildPhase;
 import com.cookiebuild.buildbattles.game.BuildBattlesGame;
 import com.cookiebuild.buildbattles.security.BuildSafetyPolicy;
+import com.cookiebuild.buildbattles.ui.BuildBattlesBedrockForms;
 import com.cookiebuild.buildbattles.security.BuildResourceBudget.AddResult;
 import com.cookiebuild.buildbattles.security.BuildResourceBudget.EntityCategory;
 import com.cookiebuild.buildbattles.security.RedstoneActivityLimiter;
@@ -127,7 +128,10 @@ public final class BuildBattlesListener implements Listener {
             if (data.has(BuildBattles.getInstance().getPaletteShortcutKey(), PersistentDataType.BYTE)) {
                 if (!isPaletteShortcutUse(event.getAction())) return;
                 event.setCancelled(true);
-                BuildBattles.giveBuildPalette(event.getPlayer());
+                if (!BuildBattlesBedrockForms.openPalette(event.getPlayer(),
+                        () -> BuildBattles.giveBuildPalette(event.getPlayer()))) {
+                    BuildBattles.giveBuildPalette(event.getPlayer());
+                }
                 return;
             }
             if (data.has(BuildBattles.getInstance().getThemeKey(), PersistentDataType.STRING)) {

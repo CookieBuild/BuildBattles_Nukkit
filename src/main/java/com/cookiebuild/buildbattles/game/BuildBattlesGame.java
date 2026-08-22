@@ -42,6 +42,7 @@ import com.cookiebuild.buildbattles.security.BuildResourceBudget.BlockKey;
 import com.cookiebuild.buildbattles.security.BuildResourceBudget.EntityCategory;
 import com.cookiebuild.buildbattles.security.FluidSafetyPolicy;
 import com.cookiebuild.buildbattles.security.RedstoneActivityLimiter;
+import com.cookiebuild.buildbattles.ui.BuildBattlesBedrockForms;
 import com.cookiebuild.cookiedough.CookieDough;
 import com.cookiebuild.cookiedough.game.FunnelTelemetry;
 import com.cookiebuild.cookiedough.game.Game;
@@ -189,6 +190,7 @@ public final class BuildBattlesGame extends Game {
                 Title.Times.times(Duration.ofMillis(250), Duration.ofSeconds(3), Duration.ofMillis(500))));
         player.sendMessage(Component.text(BuildBattles.message(player, "bb.waiting.area"), NamedTextColor.AQUA));
         player.sendMessage(themePrompt(player));
+        BuildBattlesBedrockForms.openTheme(player, themeBallot.candidates(), theme -> voteTheme(player, theme));
     }
 
     private Component themePrompt(Player player) {
@@ -419,6 +421,7 @@ public final class BuildBattlesGame extends Game {
             player.getInventory().setItem(index, item);
         }
         player.sendMessage(Component.text(BuildBattles.message(player, "bb.vote.bedrock"), NamedTextColor.YELLOW));
+        BuildBattlesBedrockForms.openRating(player, score -> vote(player, score));
     }
 
     public VoteLedger.Result vote(Player player, int score) {
