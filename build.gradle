@@ -20,9 +20,9 @@ repositories {
 dependencies {
     implementation project(path: ':CookieDough', configuration: 'shadow')
     compileOnly 'jakarta.persistence:jakarta.persistence-api:3.2.0'
-    compileOnly 'io.papermc.paper:paper-api:26.1.2.build.74-stable'
+    compileOnly 'io.papermc.paper:paper-api:26.2.build.116-stable'
     compileOnly 'org.geysermc.cumulus:cumulus:1.1.2'
-    testImplementation 'io.papermc.paper:paper-api:26.1.2.build.74-stable'
+    testImplementation 'io.papermc.paper:paper-api:26.2.build.116-stable'
     testImplementation 'org.geysermc.cumulus:cumulus:1.1.2'
     testImplementation platform('org.junit:junit-bom:5.12.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -56,6 +56,8 @@ processResources {
 
 def mapInstallDirectory = providers.gradleProperty('cookiebuildBuildBattlesMapInstallDir')
         .map { rootProject.file(it) }
+        .orElse(providers.environmentVariable('COOKIEBUILD_E2E_SERVER_DIR')
+                .map { new File(it, 'buildbattles_maps') })
         .orElse(provider {
             new File(rootProject.projectDir.parentFile, 'Paper26_Test_Server/buildbattles_maps')
         })
