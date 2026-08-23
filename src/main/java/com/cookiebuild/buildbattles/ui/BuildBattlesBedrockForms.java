@@ -39,7 +39,7 @@ public final class BuildBattlesBedrockForms {
         BedrockFormImages.button(form, BedrockButtonText.format(
                 BuildBattles.message(player, "bb.form.close")), CLOSE_IMAGE);
         form.validResultHandler(response -> {
-            int index = response.getClickedButtonId();
+            int index = response.clickedButtonId();
             MainThreadPlayerAction.dispatch(plugin, player, () -> {
                 if (SESSIONS.consume(player.getUniqueId(), nonce, scope)
                         && index >= 0 && index < options.size()) voteHandler.accept(options.get(index));
@@ -67,7 +67,7 @@ public final class BuildBattlesBedrockForms {
         BedrockFormImages.button(form, BedrockButtonText.format(
                 BuildBattles.message(player, "bb.form.close")), CLOSE_IMAGE);
         form.validResultHandler(response -> {
-            int index = response.getClickedButtonId();
+            int index = response.clickedButtonId();
             MainThreadPlayerAction.dispatch(plugin, player, () -> {
                 if (SESSIONS.consume(player.getUniqueId(), nonce, scope)
                         && index >= 0 && index < 5) voteHandler.accept(index + 1);
@@ -94,7 +94,7 @@ public final class BuildBattlesBedrockForms {
         BedrockFormImages.button(form, BedrockButtonText.format(
                 BuildBattles.message(player, "bb.form.close")), CLOSE_IMAGE);
         form.validResultHandler(response -> {
-            int index = response.getClickedButtonId();
+            int index = response.clickedButtonId();
             MainThreadPlayerAction.dispatch(plugin, player, () -> {
                 if (SESSIONS.consume(player.getUniqueId(), nonce, scope) && index == 0) receiveHandler.run();
             });
