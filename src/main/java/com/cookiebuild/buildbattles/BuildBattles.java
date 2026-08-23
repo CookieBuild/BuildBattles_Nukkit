@@ -41,6 +41,7 @@ import com.cookiebuild.cookiedough.utils.LocaleManager;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import com.cookiebuild.cookiedough.ui.MenuLore;
 
 public final class BuildBattles extends JavaPlugin {
     private static BuildBattles instance;
@@ -241,7 +242,7 @@ public final class BuildBattles extends JavaPlugin {
         ItemStack shortcut = new ItemStack(Material.CHEST);
         ItemMeta meta = shortcut.getItemMeta();
         meta.displayName(Component.text(message(player, "bb.palette.shortcut.name"), NamedTextColor.AQUA));
-        meta.lore(List.of(Component.text(message(player, "bb.palette.shortcut.lore"), NamedTextColor.GRAY)));
+        meta.lore(List.of(MenuLore.detail(message(player, "bb.palette.shortcut.lore"))));
         meta.getPersistentDataContainer().set(instance.paletteShortcutKey, PersistentDataType.BYTE, (byte) 1);
         shortcut.setItemMeta(meta);
         player.getInventory().setItem(8, shortcut);

@@ -463,6 +463,7 @@ public final class BuildBattlesListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
+        BuildBattlesBedrockForms.invalidate(event.getPlayer());
         BuildBattlesGame game = BuildBattles.findGame(event.getPlayer());
         if (game == null) return;
         CookiePlayer tracked = game.getPlayers().stream()

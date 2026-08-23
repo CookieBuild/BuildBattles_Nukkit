@@ -60,6 +60,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
+import com.cookiebuild.cookiedough.ui.MenuLore;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.title.Title;
 
@@ -176,8 +177,7 @@ public final class BuildBattlesGame extends Game {
             ItemStack paper = new ItemStack(Material.PAPER);
             ItemMeta meta = paper.getItemMeta();
             meta.displayName(Component.text(candidate, NamedTextColor.AQUA));
-            meta.lore(List.of(Component.text(BuildBattles.message(
-                    player, "bb.theme.vote_item_lore"), NamedTextColor.GRAY)));
+            meta.lore(List.of(MenuLore.detail(BuildBattles.message(player, "bb.theme.vote_item_lore"))));
             meta.getPersistentDataContainer().set(BuildBattles.getInstance().getThemeKey(),
                     PersistentDataType.STRING, candidate);
             paper.setItemMeta(meta);
@@ -414,8 +414,7 @@ public final class BuildBattlesGame extends Game {
             ItemMeta meta = item.getItemMeta();
             meta.displayName(Component.text(value + "/5 · " + BuildBattles.message(player, "bb.vote." + value),
                     value >= 4 ? NamedTextColor.GREEN : value <= 2 ? NamedTextColor.RED : NamedTextColor.YELLOW));
-            meta.lore(List.of(Component.text(BuildBattles.message(
-                    player, "bb.vote.item_lore"), NamedTextColor.GRAY)));
+            meta.lore(List.of(MenuLore.detail(BuildBattles.message(player, "bb.vote.item_lore"))));
             meta.getPersistentDataContainer().set(BuildBattles.getInstance().getVoteKey(), PersistentDataType.INTEGER, value);
             item.setItemMeta(meta);
             player.getInventory().setItem(index, item);
