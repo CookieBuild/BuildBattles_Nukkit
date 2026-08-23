@@ -1,6 +1,10 @@
 package com.cookiebuild.buildbattles.ui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
 
@@ -23,5 +27,14 @@ class BuildBattlesBedrockFormsContractTest {
         assertEquals(true, BedrockFormImages.isKnown(BuildBattlesBedrockForms.CLOSE_IMAGE));
         assertEquals(BedrockMenuSessionRegistry.class,
                 BuildBattlesBedrockForms.class.getDeclaredField("SESSIONS").getType());
+    }
+
+    @Test
+    void bedrockThemeLabelsAreLocalizedWithoutChangingTheSubmittedTheme() throws Exception {
+        Path path = Path.of("src/main/java/com/cookiebuild/buildbattles/ui/BuildBattlesBedrockForms.java");
+        if (!Files.exists(path)) path = Path.of("BuildBattles").resolve(path);
+        String source = Files.readString(path);
+        assertTrue(source.contains("BuildBattles.themeName(player, theme)"));
+        assertTrue(source.contains("voteHandler.accept(options.get(index))"));
     }
 }

@@ -44,6 +44,11 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import com.cookiebuild.cookiedough.ui.MenuLore;
 
 public final class BuildBattles extends JavaPlugin {
+    private static final String MESSAGE_BUNDLE = "buildbattles_messages";
+    private static final String UNAVAILABLE_MESSAGE = "Text unavailable";
+    private static final Locale BRAZILIAN_PORTUGUESE = Locale.of("pt", "BR");
+    private static final ResourceBundle.Control NO_SYSTEM_LOCALE_FALLBACK =
+            ResourceBundle.Control.getNoFallbackControl(ResourceBundle.Control.FORMAT_PROPERTIES);
     private static BuildBattles instance;
     private NamespacedKey themeKey;
     private NamespacedKey voteKey;
@@ -292,18 +297,55 @@ public final class BuildBattles extends JavaPlugin {
 
     public static String message(Player player, String key, Object... arguments) {
         Locale locale = player == null ? Locale.ENGLISH : player.locale();
-        String registered = LocaleManager.getMessage("buildbattles_messages", key, locale, arguments);
-        if (!registered.equals(key)) return registered;
-        try {
-            ResourceBundle bundle = ResourceBundle.getBundle("buildbattles_messages", locale,
-                    BuildBattles.class.getClassLoader());
-            String value = bundle.getString(key);
-            for (int index = 0; index < arguments.length; index++) {
-                value = value.replace("{" + index + "}", String.valueOf(arguments[index]));
+        return messageForLocale(locale, key, arguments);
+    }
+
+    static String messageForLocale(Locale locale, String key, Object... arguments) {
+        String resolved = resolveMessage(locale, key, arguments);
+        return resolved == null ? UNAVAILABLE_MESSAGE : resolved;
+    }
+
+    public static String themeName(Player player, String theme) {
+        Locale locale = player == null ? Locale.ENGLISH : player.locale();
+        return themeNameForLocale(locale, theme);
+    }
+
+    static String themeNameForLocale(Locale locale, String theme) {
+        if (theme == null || theme.isBlank()) return "";
+        String resolved = resolveMessage(locale, themeMessageKey(theme));
+        return resolved == null ? theme : resolved;
+    }
+
+    static String themeMessageKey(String theme) {
+        if (theme == null || theme.isBlank()) return "bb.theme.name.unknown";
+        String slug = theme.trim().toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "");
+        return "bb.theme.name." + slug;
+    }
+
+    private static String resolveMessage(Locale locale, String key, Object... arguments) {
+        Locale effectiveLocale = locale == null ? Locale.ENGLISH : locale;
+        List<Locale> candidates = new ArrayList<>();
+        candidates.add(effectiveLocale);
+        if ("pt".equals(effectiveLocale.getLanguage())) candidates.add(BRAZILIAN_PORTUGUESE);
+        if (!effectiveLocale.getLanguage().isBlank()) candidates.add(Locale.of(effectiveLocale.getLanguage()));
+        candidates.add(Locale.ENGLISH);
+
+        for (Locale candidate : candidates.stream().distinct().toList()) {
+            try {
+                ResourceBundle bundle = ResourceBundle.getBundle(MESSAGE_BUNDLE, candidate,
+                        BuildBattles.class.getClassLoader(), NO_SYSTEM_LOCALE_FALLBACK);
+                if (!bundle.containsKey(key)) continue;
+                String value = bundle.getString(key);
+                for (int index = 0; index < arguments.length; index++) {
+                    value = value.replace("{" + index + "}", String.valueOf(arguments[index]));
+                }
+                return value;
+            } catch (MissingResourceException ignored) {
+                // Continue through the explicit language and English fallback chain.
             }
-            return value;
-        } catch (MissingResourceException ignored) {
-            return key;
         }
+        return null;
     }
 }

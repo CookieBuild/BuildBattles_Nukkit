@@ -34,8 +34,8 @@ public final class BuildBattlesBedrockForms {
         SimpleForm.Builder form = SimpleForm.builder()
                 .title("§l§6" + BuildBattles.message(player, "bb.form.theme.title"))
                 .content(BuildBattles.message(player, "bb.form.theme.content"));
-        options.forEach(theme -> BedrockFormImages.button(form, BedrockButtonText.format(theme),
-                MODE_IMAGE));
+        options.forEach(theme -> BedrockFormImages.button(form,
+                BedrockButtonText.format(BuildBattles.themeName(player, theme)), MODE_IMAGE));
         BedrockFormImages.button(form, BedrockButtonText.format(
                 BuildBattles.message(player, "bb.form.close")), CLOSE_IMAGE);
         form.validResultHandler(response -> {

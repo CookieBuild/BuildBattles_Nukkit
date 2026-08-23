@@ -21,9 +21,10 @@ class BuildBattlesUiLocalizationTest {
             ResourceBundle.Control.getNoFallbackControl(ResourceBundle.Control.FORMAT_PROPERTIES);
 
     @Test
-    void enFrEsAndBrazilianPortugueseHaveExactKeyAndPlaceholderParity() {
+    void completePlayerLocalesHaveExactKeyAndPlaceholderParity() {
         ResourceBundle english = bundle(Locale.ENGLISH);
-        for (Locale locale : Set.of(Locale.FRENCH, Locale.of("es"), Locale.of("pt", "BR"))) {
+        for (Locale locale : Set.of(Locale.FRENCH, Locale.of("es"), Locale.of("pt", "BR"),
+                Locale.of("bg"), Locale.of("hi"))) {
             ResourceBundle translated = bundle(locale);
             assertEquals(english.keySet(), translated.keySet(), "keys for " + locale);
             for (String key : english.keySet()) {
@@ -41,7 +42,8 @@ class BuildBattlesUiLocalizationTest {
 
         for (String forbidden : Set.of("Use to vote for this theme", "Vote \" + candidate",
                 "§6Theme:", "§6Phase:", "§6Players:", "§6Time:", "§6Blocks:",
-                "§6Plot:", "/floor changes the floor", "Use to submit your one vote")) {
+                "§6Plot:", "/floor changes the floor", "Use to submit your one vote",
+                "Component.text(candidate", "bb.theme.vote_hover\", candidate")) {
             assertFalse(source.contains(forbidden), forbidden);
         }
     }

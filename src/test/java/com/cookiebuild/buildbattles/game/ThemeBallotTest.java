@@ -21,6 +21,8 @@ class ThemeBallotTest {
         assertTrue(ballot.vote(player, ballot.candidates().get(0)));
         assertTrue(ballot.vote(player, ballot.candidates().get(1).toLowerCase()));
         assertEquals(1, ballot.count(ballot.candidates().get(1)));
+        assertEquals(ballot.candidates().get(1),
+                ballot.canonicalCandidate(ballot.candidates().get(1).toLowerCase()));
         assertFalse(ballot.vote(player, "Not proposed"));
     }
 

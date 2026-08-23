@@ -35,13 +35,18 @@ public final class ThemeBallot {
         if (playerId == null || requestedTheme == null) {
             return false;
         }
-        String selected = candidates.stream().filter(theme -> theme.equalsIgnoreCase(requestedTheme.trim()))
-                .findFirst().orElse(null);
+        String selected = canonicalCandidate(requestedTheme);
         if (selected == null) {
             return false;
         }
         votes.put(playerId, selected);
         return true;
+    }
+
+    public String canonicalCandidate(String requestedTheme) {
+        if (requestedTheme == null) return null;
+        return candidates.stream().filter(theme -> theme.equalsIgnoreCase(requestedTheme.trim()))
+                .findFirst().orElse(null);
     }
 
     public String winner(RandomGenerator random) {

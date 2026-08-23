@@ -176,7 +176,7 @@ public final class BuildBattlesGame extends Game {
             String candidate = themeBallot.candidates().get(index);
             ItemStack paper = new ItemStack(Material.PAPER);
             ItemMeta meta = paper.getItemMeta();
-            meta.displayName(Component.text(candidate, NamedTextColor.AQUA));
+            meta.displayName(Component.text(BuildBattles.themeName(player, candidate), NamedTextColor.AQUA));
             meta.lore(List.of(MenuLore.detail(BuildBattles.message(player, "bb.theme.vote_item_lore"))));
             meta.getPersistentDataContainer().set(BuildBattles.getInstance().getThemeKey(),
                     PersistentDataType.STRING, candidate);
@@ -196,19 +196,22 @@ public final class BuildBattlesGame extends Game {
     private Component themePrompt(Player player) {
         Component prompt = Component.text(BuildBattles.message(player, "bb.theme.prompt") + " ", NamedTextColor.YELLOW);
         for (String candidate : themeBallot.candidates()) {
-            prompt = prompt.append(Component.text("[" + candidate + "] ", NamedTextColor.AQUA)
+            String displayTheme = BuildBattles.themeName(player, candidate);
+            prompt = prompt.append(Component.text("[" + displayTheme + "] ", NamedTextColor.AQUA)
                     .clickEvent(ClickEvent.runCommand("/bbtheme " + candidate))
                     .hoverEvent(HoverEvent.showText(Component.text(
-                            BuildBattles.message(player, "bb.theme.vote_hover", candidate)))));
+                            BuildBattles.message(player, "bb.theme.vote_hover", displayTheme)))));
         }
         return prompt;
     }
 
     public boolean voteTheme(Player player, String requested) {
         if (phase != BuildPhase.WAITING || !participants.contains(player.getUniqueId())) return false;
-        boolean accepted = themeBallot.vote(player.getUniqueId(), requested);
+        String selected = themeBallot.canonicalCandidate(requested);
+        boolean accepted = selected != null && themeBallot.vote(player.getUniqueId(), selected);
         if (accepted) player.sendMessage(Component.text(
-                BuildBattles.message(player, "bb.theme.recorded", requested), NamedTextColor.GREEN));
+                BuildBattles.message(player, "bb.theme.recorded", BuildBattles.themeName(player, selected)),
+                NamedTextColor.GREEN));
         return accepted;
     }
 
@@ -233,7 +236,8 @@ public final class BuildBattlesGame extends Game {
         long playersReadyAt = System.nanoTime();
         startMatchPersistence();
         activePlayers.values().forEach(player -> player.getPlayer().showTitle(Title.title(
-                Component.text(theme, NamedTextColor.GOLD, TextDecoration.BOLD),
+                Component.text(BuildBattles.themeName(player.getPlayer(), theme),
+                        NamedTextColor.GOLD, TextDecoration.BOLD),
                 Component.text(BuildBattles.message(player.getPlayer(), "bb.build.start"), NamedTextColor.GREEN))));
         long finishedAt = System.nanoTime();
         BuildBattles.getInstance().getLogger().info("BuildBattles match start timing: game=" + getGameId()
@@ -346,13 +350,14 @@ public final class BuildBattlesGame extends Game {
                         ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
             } else {
                 player.sendActionBar(Component.text(BuildBattles.message(player, "bb.status.play",
-                                theme, phaseName, formatSeconds(remaining)),
+                                BuildBattles.themeName(player, theme), phaseName, formatSeconds(remaining)),
                         NamedTextColor.YELLOW));
             }
             BuildStats.Snapshot snapshot = stats.snapshot(player.getUniqueId());
             scoreboard.update(player, List.of(
                     "§6" + BuildBattles.message(player, "bb.scoreboard.theme",
-                            theme == null ? BuildBattles.message(player, "bb.theme.voting") : theme),
+                            theme == null ? BuildBattles.message(player, "bb.theme.voting")
+                                    : BuildBattles.themeName(player, theme)),
                     "§6" + BuildBattles.message(player, "bb.scoreboard.phase", phaseName),
                     " ",
                     phase == BuildPhase.WAITING
