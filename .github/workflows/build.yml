@@ -20,7 +20,10 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           repository: Guillaume351/CookieDough
-          ref: ${{ vars.COOKIE_DOUGH_REF || 'dev' }}
+          # Keep cross-repository builds reproducible. Update this SHA alongside
+          # coordinated CookieDough API changes; the repository variable is an
+          # explicit escape hatch for compatibility testing.
+          ref: ${{ vars.COOKIE_DOUGH_REF || 'aa65641843ad947a145e2a5e4d2350b4c5bf6cad' }}
           path: CookieDough
 
       - name: Set up Java 25
@@ -34,4 +37,4 @@ jobs:
 
       - name: Build BuildBattles with CookieDough
         working-directory: BuildBattles
-        run: ./gradlew build --no-daemon --warning-mode all
+        run: ../CookieDough/gradlew build --no-daemon --warning-mode all
