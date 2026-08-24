@@ -23,7 +23,7 @@ jobs:
           # Keep cross-repository builds reproducible. Update this SHA alongside
           # coordinated CookieDough API changes; the repository variable is an
           # explicit escape hatch for compatibility testing.
-          ref: ${{ vars.COOKIE_DOUGH_REF || 'aa65641843ad947a145e2a5e4d2350b4c5bf6cad' }}
+          ref: ${{ vars.COOKIE_DOUGH_REF || '76d2b591e811eacfd312815044b16c5e599f09aa' }}
           path: CookieDough
 
       - name: Set up Java 25
