@@ -301,16 +301,11 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
     }
 
     @Override
-    protected boolean teleportToSpectator(CookiePlayer cookiePlayer) {
-        if (map == null || map.world() == null) return false;
-        Player player = cookiePlayer.getPlayer();
-        Location destination = judgingPlot >= 0
+    protected Location spectatorDestination(CookiePlayer cookiePlayer) {
+        if (map == null || map.world() == null) return null;
+        return judgingPlot >= 0
                 ? map.template().judgingLocation(map.world(), judgingPlot)
                 : map.template().waitingSpawn(map.world());
-        if (!destination.getChunk().load() || !player.teleport(destination)) return false;
-        cookiePlayer.resetPlayer();
-        player.setGameMode(GameMode.SPECTATOR);
-        return true;
     }
 
     private void prepareBuilder(CookiePlayer cookiePlayer, int plot) {

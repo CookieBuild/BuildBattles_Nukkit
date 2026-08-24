@@ -15,6 +15,7 @@ class BuildBattlesContinuityContractTest {
         String removal = source.substring(source.indexOf("public synchronized void removePlayer"));
         assertTrue(source.contains("implements ReconnectableGame"));
         assertTrue(source.contains("public boolean supportsSpectating()"));
+        assertTrue(source.contains("protected Location spectatorDestination"));
         assertTrue(removal.indexOf("getSpectators().stream()")
                 < removal.indexOf("if (phase == BuildPhase.WAITING)"));
         assertTrue(source.indexOf("ejectSpectatorsToLobby();")
