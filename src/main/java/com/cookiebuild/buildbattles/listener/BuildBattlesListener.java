@@ -40,7 +40,6 @@ import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.vehicle.VehicleCreateEvent;
@@ -448,17 +447,6 @@ public final class BuildBattlesListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onConsume(PlayerItemConsumeEvent event) {
         if (BuildBattles.findGame(event.getPlayer()) != null) event.setCancelled(true);
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onJoin(PlayerJoinEvent event) {
-        Bukkit.getScheduler().runTaskLater(BuildBattles.getInstance(), () -> {
-            CookiePlayer cookiePlayer = PlayerManager.getPlayer(event.getPlayer());
-            if (cookiePlayer == null) return;
-            for (Game candidate : GameManager.getGames()) {
-                if (candidate instanceof BuildBattlesGame game && game.reconnect(cookiePlayer)) return;
-            }
-        }, 10L);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

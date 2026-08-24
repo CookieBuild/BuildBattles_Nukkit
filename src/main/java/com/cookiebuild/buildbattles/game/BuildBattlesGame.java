@@ -48,6 +48,7 @@ import com.cookiebuild.cookiedough.game.FunnelTelemetry;
 import com.cookiebuild.cookiedough.game.Game;
 import com.cookiebuild.cookiedough.game.GameManager;
 import com.cookiebuild.cookiedough.game.GameState;
+import com.cookiebuild.cookiedough.game.ReconnectableGame;
 import com.cookiebuild.cookiedough.lobby.LobbyManager;
 import com.cookiebuild.cookiedough.lobby.LobbyScoreboard;
 import com.cookiebuild.cookiedough.model.Match;
@@ -64,7 +65,7 @@ import com.cookiebuild.cookiedough.ui.MenuLore;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.title.Title;
 
-public final class BuildBattlesGame extends Game {
+public final class BuildBattlesGame extends Game implements ReconnectableGame {
     public static final String MINIGAME_KEY = "buildbattles";
 
     public enum FloorChangeResult {
@@ -292,6 +293,24 @@ public final class BuildBattlesGame extends Game {
         Integer plot = plotByPlayer.get(cookiePlayer.getPlayer().getUniqueId());
         if (plot == null) throw new IllegalStateException("Player has no assigned plot");
         prepareBuilder(cookiePlayer, plot);
+    }
+
+    @Override
+    public boolean supportsSpectating() {
+        return true;
+    }
+
+    @Override
+    protected boolean teleportToSpectator(CookiePlayer cookiePlayer) {
+        if (map == null || map.world() == null) return false;
+        Player player = cookiePlayer.getPlayer();
+        Location destination = judgingPlot >= 0
+                ? map.template().judgingLocation(map.world(), judgingPlot)
+                : map.template().waitingSpawn(map.world());
+        if (!destination.getChunk().load() || !player.teleport(destination)) return false;
+        cookiePlayer.resetPlayer();
+        player.setGameMode(GameMode.SPECTATOR);
+        return true;
     }
 
     private void prepareBuilder(CookiePlayer cookiePlayer, int plot) {
@@ -831,6 +850,14 @@ public final class BuildBattlesGame extends Game {
         return true;
     }
 
+    @Override
+    public boolean hasReconnectReservation(UUID playerId) {
+        if (playerId == null || phase == BuildPhase.WAITING || phase == BuildPhase.FINISHED) return false;
+        Long disconnected = disconnectedAt.get(playerId);
+        long grace = BuildBattles.getInstance().getConfig().getLong("game.reconnect-grace-seconds", 60) * 1000L;
+        return disconnected != null && System.currentTimeMillis() - disconnected <= grace;
+    }
+
     private boolean stopAbandonedMatch() {
         long now = System.currentTimeMillis();
         long grace = BuildBattles.getInstance().getConfig().getLong("game.reconnect-grace-seconds", 60) * 1000L;
@@ -855,6 +882,12 @@ public final class BuildBattlesGame extends Game {
     @Override
     public synchronized void removePlayer(CookiePlayer player, String reason) {
         UUID id = player.getPlayer().getUniqueId();
+        if (getSpectators().stream().anyMatch(viewer ->
+                viewer.getPlayer().getUniqueId().equals(id))) {
+            super.removePlayer(player, reason);
+            scoreboard.remove(player.getPlayer());
+            return;
+        }
         if (phase == BuildPhase.WAITING) {
             if (getPlayers().contains(player)) super.removePlayer(player, reason);
             participants.remove(id);
@@ -913,6 +946,7 @@ public final class BuildBattlesGame extends Game {
             }
         }
         activePlayers.clear();
+        ejectSpectatorsToLobby();
         if (!MapManager.unload(getGameId())) {
             BuildBattles.getInstance().getLogger().warning("Map cleanup remains pending for " + getGameId());
         }
