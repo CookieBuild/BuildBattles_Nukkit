@@ -172,7 +172,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         cookiePlayer.resetPlayer();
         player.setGameMode(GameMode.ADVENTURE);
         player.setAllowFlight(false);
-        player.teleport(map.template().waitingSpawn(map.world()));
+        teleportPlayerSafely(player, map.template().waitingSpawn(map.world()));
         for (int index = 0; index < themeBallot.candidates().size(); index++) {
             String candidate = themeBallot.candidates().get(index);
             ItemStack paper = new ItemStack(Material.PAPER);
@@ -309,12 +309,16 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
     }
 
     private void prepareBuilder(CookiePlayer cookiePlayer, int plot) {
+        prepareBuilder(cookiePlayer, plot, true);
+    }
+
+    private void prepareBuilder(CookiePlayer cookiePlayer, int plot, boolean teleport) {
         Player player = cookiePlayer.getPlayer();
         cookiePlayer.resetPlayer();
         cookiePlayer.setState(PlayerState.IN_GAME);
         player.setGameMode(GameMode.CREATIVE);
         player.setAllowFlight(true);
-        player.teleport(map.template().plotCenter(map.world(), plot));
+        if (teleport) teleportPlayerSafely(player, map.template().plotCenter(map.world(), plot));
         BuildBattles.givePaletteShortcut(player);
         player.sendMessage(Component.text(BuildBattles.message(player, "bb.floor.hint"), NamedTextColor.YELLOW));
         player.sendMessage(Component.text(BuildBattles.message(player, "bb.build.palette"), NamedTextColor.AQUA));
@@ -823,11 +827,19 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         long grace = BuildBattles.getInstance().getConfig().getLong("game.reconnect-grace-seconds", 60) * 1000L;
         if (disconnected == null || System.currentTimeMillis() - disconnected > grace
                 || phase == BuildPhase.WAITING || phase == BuildPhase.FINISHED) return false;
+        Integer plot = plotByPlayer.get(id);
+        if (phase == BuildPhase.BUILDING && plot == null) return false;
+        Location destination = phase == BuildPhase.BUILDING && plot != null
+                ? map.template().plotCenter(map.world(), plot)
+                : judgingPlot >= 0 ? map.template().judgingLocation(map.world(), judgingPlot)
+                : map.template().waitingSpawn(map.world());
+        if (!canRestorePlayerAfterReconnect(cookiePlayer)
+                || !tryTeleportPlayerSafely(cookiePlayer.getPlayer(), destination)) return false;
         if (!restorePlayerAfterReconnect(cookiePlayer)) return false;
         activePlayers.put(id, cookiePlayer);
         disconnectedAt.remove(id);
         if (phase == BuildPhase.BUILDING) {
-            prepareBuilder(cookiePlayer, plotByPlayer.get(id));
+            prepareBuilder(cookiePlayer, plot, false);
         } else {
             cookiePlayer.resetPlayer();
             cookiePlayer.setState(PlayerState.SPECTATING);
@@ -835,9 +847,8 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             player.setGameMode(GameMode.ADVENTURE);
             player.setAllowFlight(true);
             player.setFlying(true);
-            Location destination = judgingPlot >= 0 ? map.template().judgingLocation(map.world(), judgingPlot)
-                    : map.template().waitingSpawn(map.world());
-            player.teleport(destination);
+            CookieDough.getInstance().getPlayerTransitionFlightGuard()
+                    .protectLanding(player, true, true);
             if (phase == BuildPhase.JUDGING) giveVoteItems(player);
         }
         cookiePlayer.getPlayer().sendMessage(Component.text(
