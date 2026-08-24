@@ -20,5 +20,7 @@ class BuildBattlesContinuityContractTest {
                 < removal.indexOf("if (phase == BuildPhase.WAITING)"));
         assertTrue(source.indexOf("if (!ejectOwnedPlayersToLobby())")
                 < source.indexOf("MapManager.unload(getGameId())"));
+        assertTrue(source.indexOf("plugin != null && plugin.isEnabled()")
+                < source.indexOf("this::cleanup, 20L"));
     }
 }

@@ -932,10 +932,18 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         }
         if (!ejectOwnedPlayersToLobby()) {
             cleanupStarted = false;
-            BuildBattles.getInstance().getLogger().warning(
-                    "Deferring BuildBattles map cleanup until every player reaches the lobby: " + getGameId());
-            cleanupRetryTask = Bukkit.getScheduler().runTaskLater(
-                    BuildBattles.getInstance(), this::cleanup, 20L);
+            BuildBattles plugin = BuildBattles.getInstance();
+            if (plugin != null) {
+                plugin.getLogger().warning(
+                        "Deferring BuildBattles map cleanup until every player reaches the lobby: " + getGameId());
+            }
+            if (plugin != null && plugin.isEnabled()) {
+                try {
+                    cleanupRetryTask = Bukkit.getScheduler().runTaskLater(plugin, this::cleanup, 20L);
+                } catch (RuntimeException error) {
+                    plugin.getLogger().warning("Could not schedule BuildBattles cleanup retry: " + error.getMessage());
+                }
+            }
             return;
         }
         cancelFloorTasks();
