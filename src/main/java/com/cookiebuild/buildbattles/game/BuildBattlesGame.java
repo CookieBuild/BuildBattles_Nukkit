@@ -104,6 +104,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
     private int judgingPlot = -1;
     private boolean outcomePersisted;
     private boolean cleanupStarted;
+    private BukkitTask cleanupRetryTask;
 
     private record PendingMatchOutcome(Set<UUID> winners, List<MatchService.Performance> performances) {
         private PendingMatchOutcome {
@@ -925,6 +926,18 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         cleanupStarted = true;
         phase = BuildPhase.FINISHED;
         setState(GameState.FINISHED);
+        if (cleanupRetryTask != null) {
+            cleanupRetryTask.cancel();
+            cleanupRetryTask = null;
+        }
+        if (!ejectOwnedPlayersToLobby()) {
+            cleanupStarted = false;
+            BuildBattles.getInstance().getLogger().warning(
+                    "Deferring BuildBattles map cleanup until every player reaches the lobby: " + getGameId());
+            cleanupRetryTask = Bukkit.getScheduler().runTaskLater(
+                    BuildBattles.getInstance(), this::cleanup, 20L);
+            return;
+        }
         cancelFloorTasks();
         for (UUID entityId : resources.trackedEntityIds()) {
             Entity entity = map.world().getEntity(entityId);
@@ -952,7 +965,6 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             }
         }
         activePlayers.clear();
-        ejectSpectatorsToLobby();
         if (!MapManager.unload(getGameId())) {
             BuildBattles.getInstance().getLogger().warning("Map cleanup remains pending for " + getGameId());
         }

@@ -18,7 +18,7 @@ class BuildBattlesContinuityContractTest {
         assertTrue(source.contains("protected Location spectatorDestination"));
         assertTrue(removal.indexOf("getSpectators().stream()")
                 < removal.indexOf("if (phase == BuildPhase.WAITING)"));
-        assertTrue(source.indexOf("ejectSpectatorsToLobby();")
+        assertTrue(source.indexOf("if (!ejectOwnedPlayersToLobby())")
                 < source.indexOf("MapManager.unload(getGameId())"));
     }
 }
