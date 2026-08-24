@@ -48,6 +48,7 @@ import com.cookiebuild.cookiedough.game.FunnelTelemetry;
 import com.cookiebuild.cookiedough.game.Game;
 import com.cookiebuild.cookiedough.game.GameManager;
 import com.cookiebuild.cookiedough.game.GameState;
+import com.cookiebuild.cookiedough.game.ReconnectableGame;
 import com.cookiebuild.cookiedough.lobby.LobbyManager;
 import com.cookiebuild.cookiedough.lobby.LobbyScoreboard;
 import com.cookiebuild.cookiedough.model.Match;
@@ -64,7 +65,7 @@ import com.cookiebuild.cookiedough.ui.MenuLore;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.title.Title;
 
-public final class BuildBattlesGame extends Game {
+public final class BuildBattlesGame extends Game implements ReconnectableGame {
     public static final String MINIGAME_KEY = "buildbattles";
 
     public enum FloorChangeResult {
@@ -103,6 +104,7 @@ public final class BuildBattlesGame extends Game {
     private int judgingPlot = -1;
     private boolean outcomePersisted;
     private boolean cleanupStarted;
+    private BukkitTask cleanupRetryTask;
 
     private record PendingMatchOutcome(Set<UUID> winners, List<MatchService.Performance> performances) {
         private PendingMatchOutcome {
@@ -171,7 +173,7 @@ public final class BuildBattlesGame extends Game {
         cookiePlayer.resetPlayer();
         player.setGameMode(GameMode.ADVENTURE);
         player.setAllowFlight(false);
-        player.teleport(map.template().waitingSpawn(map.world()));
+        teleportPlayerSafely(player, map.template().waitingSpawn(map.world()));
         for (int index = 0; index < themeBallot.candidates().size(); index++) {
             String candidate = themeBallot.candidates().get(index);
             ItemStack paper = new ItemStack(Material.PAPER);
@@ -294,13 +296,30 @@ public final class BuildBattlesGame extends Game {
         prepareBuilder(cookiePlayer, plot);
     }
 
+    @Override
+    public boolean supportsSpectating() {
+        return true;
+    }
+
+    @Override
+    protected Location spectatorDestination(CookiePlayer cookiePlayer) {
+        if (map == null || map.world() == null) return null;
+        return judgingPlot >= 0
+                ? map.template().judgingLocation(map.world(), judgingPlot)
+                : map.template().waitingSpawn(map.world());
+    }
+
     private void prepareBuilder(CookiePlayer cookiePlayer, int plot) {
+        prepareBuilder(cookiePlayer, plot, true);
+    }
+
+    private void prepareBuilder(CookiePlayer cookiePlayer, int plot, boolean teleport) {
         Player player = cookiePlayer.getPlayer();
         cookiePlayer.resetPlayer();
         cookiePlayer.setState(PlayerState.IN_GAME);
         player.setGameMode(GameMode.CREATIVE);
         player.setAllowFlight(true);
-        player.teleport(map.template().plotCenter(map.world(), plot));
+        if (teleport) teleportPlayerSafely(player, map.template().plotCenter(map.world(), plot));
         BuildBattles.givePaletteShortcut(player);
         player.sendMessage(Component.text(BuildBattles.message(player, "bb.floor.hint"), NamedTextColor.YELLOW));
         player.sendMessage(Component.text(BuildBattles.message(player, "bb.build.palette"), NamedTextColor.AQUA));
@@ -809,11 +828,19 @@ public final class BuildBattlesGame extends Game {
         long grace = BuildBattles.getInstance().getConfig().getLong("game.reconnect-grace-seconds", 60) * 1000L;
         if (disconnected == null || System.currentTimeMillis() - disconnected > grace
                 || phase == BuildPhase.WAITING || phase == BuildPhase.FINISHED) return false;
+        Integer plot = plotByPlayer.get(id);
+        if (phase == BuildPhase.BUILDING && plot == null) return false;
+        Location destination = phase == BuildPhase.BUILDING && plot != null
+                ? map.template().plotCenter(map.world(), plot)
+                : judgingPlot >= 0 ? map.template().judgingLocation(map.world(), judgingPlot)
+                : map.template().waitingSpawn(map.world());
+        if (!canRestorePlayerAfterReconnect(cookiePlayer)
+                || !tryTeleportPlayerSafely(cookiePlayer.getPlayer(), destination)) return false;
         if (!restorePlayerAfterReconnect(cookiePlayer)) return false;
         activePlayers.put(id, cookiePlayer);
         disconnectedAt.remove(id);
         if (phase == BuildPhase.BUILDING) {
-            prepareBuilder(cookiePlayer, plotByPlayer.get(id));
+            prepareBuilder(cookiePlayer, plot, false);
         } else {
             cookiePlayer.resetPlayer();
             cookiePlayer.setState(PlayerState.SPECTATING);
@@ -821,14 +848,21 @@ public final class BuildBattlesGame extends Game {
             player.setGameMode(GameMode.ADVENTURE);
             player.setAllowFlight(true);
             player.setFlying(true);
-            Location destination = judgingPlot >= 0 ? map.template().judgingLocation(map.world(), judgingPlot)
-                    : map.template().waitingSpawn(map.world());
-            player.teleport(destination);
+            CookieDough.getInstance().getPlayerTransitionFlightGuard()
+                    .protectLanding(player, true, true);
             if (phase == BuildPhase.JUDGING) giveVoteItems(player);
         }
         cookiePlayer.getPlayer().sendMessage(Component.text(
                 BuildBattles.message(cookiePlayer.getPlayer(), "bb.reconnected"), NamedTextColor.GREEN));
         return true;
+    }
+
+    @Override
+    public boolean hasReconnectReservation(UUID playerId) {
+        if (playerId == null || phase == BuildPhase.WAITING || phase == BuildPhase.FINISHED) return false;
+        Long disconnected = disconnectedAt.get(playerId);
+        long grace = BuildBattles.getInstance().getConfig().getLong("game.reconnect-grace-seconds", 60) * 1000L;
+        return disconnected != null && System.currentTimeMillis() - disconnected <= grace;
     }
 
     private boolean stopAbandonedMatch() {
@@ -855,6 +889,12 @@ public final class BuildBattlesGame extends Game {
     @Override
     public synchronized void removePlayer(CookiePlayer player, String reason) {
         UUID id = player.getPlayer().getUniqueId();
+        if (getSpectators().stream().anyMatch(viewer ->
+                viewer.getPlayer().getUniqueId().equals(id))) {
+            super.removePlayer(player, reason);
+            scoreboard.remove(player.getPlayer());
+            return;
+        }
         if (phase == BuildPhase.WAITING) {
             if (getPlayers().contains(player)) super.removePlayer(player, reason);
             participants.remove(id);
@@ -886,6 +926,26 @@ public final class BuildBattlesGame extends Game {
         cleanupStarted = true;
         phase = BuildPhase.FINISHED;
         setState(GameState.FINISHED);
+        if (cleanupRetryTask != null) {
+            cleanupRetryTask.cancel();
+            cleanupRetryTask = null;
+        }
+        if (!ejectOwnedPlayersToLobby()) {
+            cleanupStarted = false;
+            BuildBattles plugin = BuildBattles.getInstance();
+            if (plugin != null) {
+                plugin.getLogger().warning(
+                        "Deferring BuildBattles map cleanup until every player reaches the lobby: " + getGameId());
+            }
+            if (plugin != null && plugin.isEnabled()) {
+                try {
+                    cleanupRetryTask = Bukkit.getScheduler().runTaskLater(plugin, this::cleanup, 20L);
+                } catch (RuntimeException error) {
+                    plugin.getLogger().warning("Could not schedule BuildBattles cleanup retry: " + error.getMessage());
+                }
+            }
+            return;
+        }
         cancelFloorTasks();
         for (UUID entityId : resources.trackedEntityIds()) {
             Entity entity = map.world().getEntity(entityId);
