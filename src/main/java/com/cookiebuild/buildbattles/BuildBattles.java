@@ -176,7 +176,7 @@ public final class BuildBattles extends JavaPlugin {
                 CookiePlayer cookiePlayer = PlayerManager.getPlayer(player);
                 if (cookiePlayer != null && (cookiePlayer.getState() != PlayerState.LOBBY
                         || GameManager.getGameOfPlayer(cookiePlayer) != null)) {
-                    LobbyManager.teleportPlayerToLobby(cookiePlayer);
+                    if (!LobbyManager.teleportPlayerToLobby(cookiePlayer)) return true;
                 }
             }
             CookieDough.getInstance().getLobbyManager().requestGame(player, "BuildBattles");

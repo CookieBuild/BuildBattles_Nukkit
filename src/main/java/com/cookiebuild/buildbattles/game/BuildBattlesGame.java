@@ -487,7 +487,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
                             NamedTextColor.GRAY),
                     Title.Times.times(Duration.ofMillis(300), Duration.ofSeconds(3), Duration.ofMillis(500))));
             sendRanking(player, result);
-            sendReplay(player);
+            recordMatchCompleted(player);
         }
         persistOutcome(winners, placements, false, true);
     }
@@ -524,13 +524,8 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         return String.format(java.util.Locale.ROOT, "%.2f", rating);
     }
 
-    private void sendReplay(Player player) {
+    private void recordMatchCompleted(Player player) {
         FunnelTelemetry.record(player, FunnelTelemetry.Event.MATCH_COMPLETED, "game=BuildBattles");
-        CookieDough.getInstance().getPlayerHubMenu().openReplay(player, "BuildBattles");
-    }
-
-    static String replayCommand() {
-        return "/buildbattles replay";
     }
 
     private void persistOutcome(Set<UUID> winners, Map<UUID, Integer> placements,
