@@ -124,6 +124,13 @@ public final class BuildBattlesListener implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         if (event.getItem() != null && event.getItem().hasItemMeta()) {
             var data = event.getItem().getItemMeta().getPersistentDataContainer();
+            if (data.has(BuildBattles.getInstance().getRatingMenuKey(), PersistentDataType.BYTE)) {
+                if (!isVoteUseAction(event.getAction())) return;
+                event.setCancelled(true);
+                BuildBattlesGame game = BuildBattles.findGame(event.getPlayer());
+                if (game != null) game.openRatingMenu(event.getPlayer());
+                return;
+            }
             if (data.has(BuildBattles.getInstance().getPaletteShortcutKey(), PersistentDataType.BYTE)) {
                 if (!isPaletteShortcutUse(event.getAction())) return;
                 event.setCancelled(true);

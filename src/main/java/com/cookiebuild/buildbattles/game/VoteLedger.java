@@ -21,17 +21,26 @@ public final class VoteLedger {
     }
 
     public Result vote(int plot, UUID voter, int score) {
-        if (voter == null || score < 1 || score > 5 || !owners.containsKey(plot)) {
+        if (score < 1 || score > 5) {
+            return Result.INVALID_SCORE;
+        }
+        Result eligibility = eligibility(plot, voter);
+        if (eligibility != Result.ACCEPTED) return eligibility;
+        votes.computeIfAbsent(plot, ignored -> new HashMap<>()).put(voter, score);
+        return Result.ACCEPTED;
+    }
+
+    /** Read-only eligibility check used before presenting voting controls. */
+    public Result eligibility(int plot, UUID voter) {
+        if (voter == null || !owners.containsKey(plot)) {
             return Result.INVALID_SCORE;
         }
         if (voter.equals(owners.get(plot))) {
             return Result.SELF_VOTE;
         }
-        Map<UUID, Integer> plotVotes = votes.computeIfAbsent(plot, ignored -> new HashMap<>());
-        if (plotVotes.containsKey(voter)) {
+        if (votes.getOrDefault(plot, Map.of()).containsKey(voter)) {
             return Result.ALREADY_VOTED;
         }
-        plotVotes.put(voter, score);
         return Result.ACCEPTED;
     }
 

@@ -31,4 +31,35 @@ class ThemeBallotTest {
         ThemeBallot ballot = new ThemeBallot(List.of("Farm", "Pizza", "Rocket"), 2, new Random(2));
         assertTrue(ballot.candidates().contains(ballot.winner(new Random(3))));
     }
+
+    @Test
+    void leavingBeforeStartRemovesTheDepartedPlayersInfluence() {
+        ThemeBallot ballot = new ThemeBallot(List.of("Farm", "Pizza"), 2, new Random(2));
+        UUID remaining = UUID.randomUUID();
+        UUID departed = UUID.randomUUID();
+        UUID anotherDeparture = UUID.randomUUID();
+        ballot.vote(remaining, "Farm");
+        ballot.vote(departed, "Pizza");
+        ballot.vote(anotherDeparture, "Pizza");
+        assertEquals("Pizza", ballot.winner(new Random(3)));
+
+        ballot.withdraw(departed);
+        ballot.withdraw(anotherDeparture);
+        assertEquals(0, ballot.count("Pizza"));
+        assertEquals("Farm", ballot.winner(new Random(3)));
+    }
+
+    @Test
+    void departureIsIdempotentAndReturningPlayerCanChooseAgain() {
+        ThemeBallot ballot = new ThemeBallot(List.of("Farm", "Pizza"), 2, new Random(2));
+        UUID player = UUID.randomUUID();
+        ballot.vote(player, "Pizza");
+        ballot.withdraw(player);
+        ballot.withdraw(player);
+        assertEquals(0, ballot.count("Pizza"));
+
+        assertTrue(ballot.vote(player, "Farm"));
+        assertEquals(1, ballot.count("Farm"));
+        assertEquals("Farm", ballot.winner(new Random(3)));
+    }
 }

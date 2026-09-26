@@ -52,6 +52,7 @@ public final class BuildBattles extends JavaPlugin {
     private static BuildBattles instance;
     private NamespacedKey themeKey;
     private NamespacedKey voteKey;
+    private NamespacedKey ratingMenuKey;
     private NamespacedKey paletteShortcutKey;
     private NamespacedKey entityOwnerKey;
     private NamespacedKey entityCategoryKey;
@@ -115,6 +116,7 @@ public final class BuildBattles extends JavaPlugin {
         LocaleManager.registerBundle("buildbattles_messages");
         themeKey = new NamespacedKey(this, "theme_vote");
         voteKey = new NamespacedKey(this, "plot_vote");
+        ratingMenuKey = new NamespacedKey(this, "rating_menu");
         paletteShortcutKey = new NamespacedKey(this, "palette_shortcut");
         entityOwnerKey = new NamespacedKey(this, "build_owner");
         entityCategoryKey = new NamespacedKey(this, "build_entity_category");
@@ -193,9 +195,11 @@ public final class BuildBattles extends JavaPlugin {
         });
         PluginCommand vote = Objects.requireNonNull(getCommand("bbvote"));
         vote.setExecutor((sender, command, label, args) -> {
-            if (!(sender instanceof Player player) || args.length != 1) return false;
+            if (!(sender instanceof Player player)) return false;
+            BuildBattlesGame game = findGame(player);
+            if (args.length == 0) return game != null && game.openRatingMenu(player);
+            if (args.length != 1) return false;
             try {
-                BuildBattlesGame game = findGame(player);
                 if (game != null) game.vote(player, Integer.parseInt(args[0]));
             } catch (NumberFormatException ignored) {
                 player.sendMessage(Component.text(message(player, "bb.vote.invalid"), NamedTextColor.RED));
@@ -291,6 +295,7 @@ public final class BuildBattles extends JavaPlugin {
 
     public NamespacedKey getThemeKey() { return themeKey; }
     public NamespacedKey getVoteKey() { return voteKey; }
+    public NamespacedKey getRatingMenuKey() { return ratingMenuKey; }
     public NamespacedKey getPaletteShortcutKey() { return paletteShortcutKey; }
     public NamespacedKey getEntityOwnerKey() { return entityOwnerKey; }
     public NamespacedKey getEntityCategoryKey() { return entityCategoryKey; }

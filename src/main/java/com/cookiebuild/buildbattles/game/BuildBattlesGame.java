@@ -56,12 +56,13 @@ import com.cookiebuild.cookiedough.player.CookiePlayer;
 import com.cookiebuild.cookiedough.player.PlayerState;
 import com.cookiebuild.cookiedough.service.MatchService;
 import com.cookiebuild.cookiedough.service.MinigameProgressionService;
+import com.cookiebuild.cookiedough.ui.BedrockFormSupport;
+import com.cookiebuild.cookiedough.ui.MenuLore;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
-import com.cookiebuild.cookiedough.ui.MenuLore;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.title.Title;
 
@@ -160,6 +161,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             prepareWaitingPlayer(cookiePlayer);
             return true;
         } catch (RuntimeException error) {
+            themeBallot.withdraw(id);
             participants.remove(id);
             activePlayers.remove(id);
             super.removePlayer(cookiePlayer, "admission_failed");
@@ -424,12 +426,14 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             player.setAllowFlight(true);
             player.setFlying(true);
             player.teleport(map.template().judgingLocation(map.world(), judgingPlot));
-            giveVoteItems(player);
             player.sendMessage(Component.text(BuildBattles.message(player, "bb.judging.anonymous"), NamedTextColor.AQUA));
+            giveVoteItems(player);
         }
     }
 
     private void giveVoteItems(Player player) {
+        BuildBattlesBedrockForms.invalidate(player);
+        if (!canPresentVote(player)) return;
         Material[] materials = {Material.RED_TERRACOTTA, Material.ORANGE_TERRACOTTA,
                 Material.YELLOW_TERRACOTTA, Material.LIME_TERRACOTTA, Material.CYAN_TERRACOTTA};
         for (int index = 0; index < materials.length; index++) {
@@ -444,11 +448,43 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             player.getInventory().setItem(index, item);
         }
         player.sendMessage(Component.text(BuildBattles.message(player, "bb.vote.bedrock"), NamedTextColor.YELLOW));
-        BuildBattlesBedrockForms.openRating(player, score -> vote(player, score));
+        if (BedrockFormSupport.isBedrock(player)) {
+            ItemStack shortcut = new ItemStack(Material.NETHER_STAR);
+            ItemMeta meta = shortcut.getItemMeta();
+            meta.displayName(Component.text(BuildBattles.message(player, "bb.form.rating.title"), NamedTextColor.AQUA));
+            meta.lore(List.of(MenuLore.detail(BuildBattles.message(player, "bb.vote.menu_hint"))));
+            meta.getPersistentDataContainer().set(BuildBattles.getInstance().getRatingMenuKey(),
+                    PersistentDataType.BYTE, (byte) 1);
+            shortcut.setItemMeta(meta);
+            player.getInventory().setItem(8, shortcut);
+            player.sendMessage(Component.text(BuildBattles.message(player, "bb.vote.menu_hint"), NamedTextColor.AQUA));
+        }
+    }
+
+    private boolean canPresentVote(Player player) {
+        VoteLedger.Result eligibility = voteLedger.eligibility(judgingPlot, player.getUniqueId());
+        if (eligibility == VoteLedger.Result.ACCEPTED) return true;
+        if (eligibility == VoteLedger.Result.SELF_VOTE) {
+            player.sendMessage(Component.text(BuildBattles.message(player, "bb.vote.self"), NamedTextColor.YELLOW));
+        } else if (eligibility == VoteLedger.Result.ALREADY_VOTED) {
+            player.sendMessage(Component.text(BuildBattles.message(player, "bb.vote.accepted",
+                    voteLedger.votesFor(judgingPlot).get(player.getUniqueId())), NamedTextColor.GREEN));
+        }
+        return false;
+    }
+
+    public boolean openRatingMenu(Player player) {
+        if (phase != BuildPhase.JUDGING || judgingPlot < 0 || !isActive(player.getUniqueId())) return false;
+        if (!canPresentVote(player)) return true;
+        int displayedPlot = judgingPlot;
+        return BuildBattlesBedrockForms.openRating(player, score -> {
+            // A delayed response belongs only to the construction the player chose to rate.
+            if (judgingPlot == displayedPlot) vote(player, score);
+        });
     }
 
     public VoteLedger.Result vote(Player player, int score) {
-        if (phase != BuildPhase.JUDGING || judgingPlot < 0 || !participants.contains(player.getUniqueId())) {
+        if (phase != BuildPhase.JUDGING || judgingPlot < 0 || !isActive(player.getUniqueId())) {
             return VoteLedger.Result.INVALID_SCORE;
         }
         VoteLedger.Result result = voteLedger.vote(judgingPlot, player.getUniqueId(), score);
@@ -477,6 +513,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         for (CookiePlayer cookiePlayer : activePlayers.values()) {
             Player player = cookiePlayer.getPlayer();
             if (!player.isOnline()) continue;
+            BuildBattlesBedrockForms.invalidate(player);
             player.teleport(resultLocation);
             boolean won = winners.contains(player.getUniqueId());
             player.showTitle(Title.title(
@@ -884,6 +921,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
     @Override
     public synchronized void removePlayer(CookiePlayer player, String reason) {
         UUID id = player.getPlayer().getUniqueId();
+        BuildBattlesBedrockForms.invalidate(player.getPlayer());
         if (getSpectators().stream().anyMatch(viewer ->
                 viewer.getPlayer().getUniqueId().equals(id))) {
             super.removePlayer(player, reason);
@@ -892,6 +930,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         }
         if (phase == BuildPhase.WAITING) {
             if (getPlayers().contains(player)) super.removePlayer(player, reason);
+            themeBallot.withdraw(id);
             participants.remove(id);
             activePlayers.remove(id);
             stats.clear(); // waiting stats contain no durable contribution

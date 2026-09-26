@@ -49,6 +49,11 @@ public final class ThemeBallot {
                 .findFirst().orElse(null);
     }
 
+    /** Leaving the waiting room also withdraws that player's choice for the next match. */
+    public void withdraw(UUID playerId) {
+        votes.remove(playerId);
+    }
+
     public String winner(RandomGenerator random) {
         if (random == null) {
             throw new IllegalArgumentException("Random generator is required");
