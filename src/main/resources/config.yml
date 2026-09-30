@@ -27,6 +27,9 @@ game:
   judging-seconds-per-plot: 12
   results-seconds: 10
   reconnect-grace-seconds: 60
+  # A queued player joins a running match on a free plot during the first
+  # seconds of its build phase instead of waiting alone in an empty lobby.
+  late-join-seconds: 90
   theme-candidates: 3
 
 floor:

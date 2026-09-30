@@ -30,7 +30,7 @@ class BuildBattlesThemeLocalizationTest {
         assertEquals(49, themes.size());
 
         for (Locale locale : List.of(Locale.ENGLISH, Locale.FRENCH, Locale.of("es"),
-                Locale.of("pt", "BR"), Locale.of("bg"), Locale.of("hi"))) {
+                Locale.of("pt", "BR"), Locale.of("bg"), Locale.of("hi"), Locale.GERMAN, Locale.of("pa"))) {
             ResourceBundle bundle = ResourceBundle.getBundle("buildbattles_messages", locale,
                     BuildBattlesThemeLocalizationTest.class.getClassLoader(), NO_FALLBACK);
             for (String theme : themes) {

@@ -49,6 +49,7 @@ import com.cookiebuild.cookiedough.game.Game;
 import com.cookiebuild.cookiedough.game.GameManager;
 import com.cookiebuild.cookiedough.game.GameState;
 import com.cookiebuild.cookiedough.game.ReconnectableGame;
+import com.cookiebuild.cookiedough.listener.PlayerWrapperListener;
 import com.cookiebuild.cookiedough.lobby.LobbyManager;
 import com.cookiebuild.cookiedough.lobby.LobbyScoreboard;
 import com.cookiebuild.cookiedough.model.Match;
@@ -68,6 +69,8 @@ import net.kyori.adventure.title.Title;
 
 public final class BuildBattlesGame extends Game implements ReconnectableGame {
     public static final String MINIGAME_KEY = "buildbattles";
+    /** A lone player waiting this long may start a solo match (CookieDough hook). */
+    static final int SOLO_START_AFTER_SECONDS = 15;
 
     public enum FloorChangeResult {
         STARTED,
@@ -92,6 +95,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
     private final Map<UUID, Long> disconnectedAt = new HashMap<>();
     private final Set<UUID> forfeited = new LinkedHashSet<>();
     private final Map<UUID, Long> lastFloorChange = new HashMap<>();
+    private final Map<UUID, Long> waitingSince = new HashMap<>();
     private final List<BukkitTask> floorTasks = new ArrayList<>();
     private final Object matchPersistenceLock = new Object();
 
@@ -103,6 +107,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
     private String theme;
     private int phaseSeconds;
     private int judgingPlot = -1;
+    private int startingPlayers;
     private boolean outcomePersisted;
     private boolean cleanupStarted;
     private BukkitTask cleanupRetryTask;
@@ -157,6 +162,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         participants.add(id);
         activePlayers.put(id, cookiePlayer);
         stats.register(id);
+        waitingSince.put(id, System.currentTimeMillis());
         try {
             prepareWaitingPlayer(cookiePlayer);
             return true;
@@ -164,6 +170,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             themeBallot.withdraw(id);
             participants.remove(id);
             activePlayers.remove(id);
+            waitingSince.remove(id);
             super.removePlayer(cookiePlayer, "admission_failed");
             cookiePlayer.setState(PlayerState.LOBBY);
             return false;
@@ -223,7 +230,10 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
     public void startGame() {
         long startedAt = System.nanoTime();
         List<CookiePlayer> starters = getPlayers();
-        if (starters.size() < 2 || starters.size() > map.template().capacity()) return;
+        // One player is enough once CookieDough's solo-start hook fires.
+        if (starters.isEmpty() || starters.size() > map.template().capacity()) return;
+        startingPlayers = starters.size();
+        waitingSince.clear();
         int plot = 0;
         for (CookiePlayer cookiePlayer : starters) {
             UUID id = cookiePlayer.getPlayer().getUniqueId();
@@ -243,6 +253,9 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
                 Component.text(BuildBattles.themeName(player.getPlayer(), theme),
                         NamedTextColor.GOLD, TextDecoration.BOLD),
                 Component.text(BuildBattles.message(player.getPlayer(), "bb.build.start"), NamedTextColor.GREEN))));
+        String howTo = startingPlayers == 1 ? "bb.howto.solo" : "bb.howto";
+        activePlayers.values().forEach(player -> player.getPlayer().sendMessage(Component.text(
+                BuildBattles.message(player.getPlayer(), howTo), NamedTextColor.AQUA)));
         long finishedAt = System.nanoTime();
         BuildBattles.getInstance().getLogger().info("BuildBattles match start timing: game=" + getGameId()
                 + " roster_ms=" + elapsedMillis(startedAt, rosterReadyAt)
@@ -333,10 +346,18 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         updateDisplay();
         if (phase == BuildPhase.WAITING || phase == BuildPhase.FINISHED) return;
         if (stopAbandonedMatch()) return;
+        if (finishShortHandedMatch()) return;
         phaseSeconds++;
         switch (phase) {
             case BUILDING -> {
-                if (phaseSeconds >= buildSeconds()) startJudging();
+                if (phaseSeconds >= buildSeconds()) {
+                    if (ShortHandedMatchPolicy.atBuildEnd(remainingBuilders(), disconnectedAt.size())
+                            == ShortHandedMatchPolicy.Outcome.SOLO_RESULT) {
+                        finishWithoutJudging(ShortHandedMatchPolicy.Outcome.SOLO_RESULT);
+                    } else {
+                        startJudging();
+                    }
+                }
             }
             case JUDGING -> {
                 if (phaseSeconds >= judgingSeconds()) advanceJudging();
@@ -362,9 +383,12 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             if (phase == BuildPhase.WAITING) {
                 WaitingStatus waiting = WaitingStatus.from(getPlayers().size(), getCapacity(), getMinimumPlayers(),
                         getStartTimer(), inQuickStart ? QUICK_START_DELAY_SECONDS : START_DELAY_SECONDS);
+                int soloStartIn = waiting.isCountingDown() ? -1 : WaitingStatus.soloStartRemaining(
+                        waiting.players(), waitedSeconds(player.getUniqueId()), soloStartAfterSeconds());
                 String status = waiting.isCountingDown()
                         ? BuildBattles.message(player, "bb.waiting.starting", waiting.secondsRemaining(),
                                 waiting.players(), waiting.capacity())
+                        : soloStartIn >= 0 ? BuildBattles.message(player, "bb.waiting.solo", soloStartIn)
                         : BuildBattles.message(player, "bb.waiting.players", waiting.players(), waiting.capacity(),
                                 waiting.morePlayersNeeded());
                 player.sendActionBar(Component.text(status, waiting.isCountingDown()
@@ -391,6 +415,16 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
                                     judgingPlot + 1, playerByPlot.size())
                                     : "§7" + BuildBattles.message(player, "bb.scoreboard.floor_hint")));
         }
+    }
+
+    private long waitedSeconds(UUID playerId) {
+        Long since = waitingSince.get(playerId);
+        return since == null ? 0L : Math.max(0L, (System.currentTimeMillis() - since) / 1000L);
+    }
+
+    @Override
+    protected int soloStartAfterSeconds() {
+        return SOLO_START_AFTER_SECONDS;
     }
 
     private static String formatSeconds(int seconds) {
@@ -497,6 +531,61 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         player.sendMessage(Component.text(BuildBattles.message(player, key, score),
                 result == VoteLedger.Result.ACCEPTED ? NamedTextColor.GREEN : NamedTextColor.RED));
         return result;
+    }
+
+    /** Builders still holding a plot: neither forfeited nor gone for good. */
+    private int remainingBuilders() {
+        return (int) playerByPlot.values().stream().filter(id -> !forfeited.contains(id)).count();
+    }
+
+    private boolean finishShortHandedMatch() {
+        ShortHandedMatchPolicy.Outcome outcome = ShortHandedMatchPolicy.duringMatch(phase, startingPlayers,
+                remainingBuilders(), disconnectedAt.size(), phaseSeconds, buildSeconds());
+        if (outcome == ShortHandedMatchPolicy.Outcome.CONTINUE) return false;
+        finishWithoutJudging(outcome);
+        return true;
+    }
+
+    /**
+     * Ends a match that has a single builder left without judging: nobody can
+     * rate a plot he owns, and no winner is invented for a solo build.
+     */
+    private void finishWithoutJudging(ShortHandedMatchPolicy.Outcome outcome) {
+        cancelFloorTasks();
+        phase = BuildPhase.RESULTS;
+        phaseSeconds = 0;
+        judgingPlot = -1;
+        UUID survivor = playerByPlot.values().stream().filter(id -> !forfeited.contains(id))
+                .findFirst().orElse(null);
+        boolean victory = outcome == ShortHandedMatchPolicy.Outcome.FORFEIT_VICTORY && survivor != null;
+        Set<UUID> winners = victory ? Set.of(survivor) : Set.of();
+        Map<UUID, Integer> placements = victory ? Map.of(survivor, 1) : Map.of();
+        String prefix = switch (outcome) {
+            case FORFEIT_VICTORY -> "bb.forfeit.victory";
+            case FORFEIT_PARTICIPATION -> "bb.forfeit.finished";
+            default -> "bb.solo";
+        };
+        for (CookiePlayer cookiePlayer : activePlayers.values()) {
+            Player player = cookiePlayer.getPlayer();
+            if (!player.isOnline()) continue;
+            BuildBattlesBedrockForms.invalidate(player);
+            cookiePlayer.resetPlayer();
+            cookiePlayer.setState(PlayerState.SPECTATING);
+            player.setGameMode(GameMode.ADVENTURE);
+            player.setAllowFlight(true);
+            player.setFlying(true);
+            Integer plot = plotByPlayer.get(player.getUniqueId());
+            if (plot != null) player.teleport(map.template().judgingLocation(map.world(), plot));
+            player.showTitle(Title.title(
+                    Component.text(BuildBattles.message(player, prefix + ".title"),
+                            victory ? NamedTextColor.GOLD : NamedTextColor.AQUA, TextDecoration.BOLD),
+                    Component.text(BuildBattles.message(player, prefix + ".subtitle"), NamedTextColor.GRAY),
+                    Title.Times.times(Duration.ofMillis(300), Duration.ofSeconds(4), Duration.ofMillis(500))));
+            recordMatchCompleted(player);
+        }
+        BuildBattles.getInstance().getLogger().info("BuildBattles match " + getGameId()
+                + " finished without judging: outcome=" + outcome + " builders=" + playerByPlot.size());
+        persistOutcome(winners, placements, false, true);
     }
 
     private void showResults() {
@@ -914,7 +1003,97 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
     }
 
     @Override public boolean isGameEnded() { return phase == BuildPhase.FINISHED; }
-    @Override public boolean addPlayerToAvailableTeam(CookiePlayer player) { return addPlayer(player); }
+    /**
+     * Queue entry point used by direct requests and Quick Play. An empty waiting
+     * lobby first offers the player a free plot in a match that is still early in
+     * its build phase, so a lone player starts building immediately.
+     */
+    @Override
+    public boolean addPlayerToAvailableTeam(CookiePlayer player) {
+        if (tryLateJoinRunningMatch(player)) return true;
+        return addPlayer(player);
+    }
+
+    private boolean tryLateJoinRunningMatch(CookiePlayer cookiePlayer) {
+        if (cookiePlayer == null || cookiePlayer.getPlayer() == null || !cookiePlayer.getPlayer().isOnline()
+                || phase != BuildPhase.WAITING || !isAdmissionsOpen()
+                || !LateJoinPolicy.preferRunningMatch(getPlayerCount())
+                || cookiePlayer.getState() != PlayerState.LOBBY
+                || GameManager.getGameOfPlayer(cookiePlayer) != null) return false;
+        CookieDough core = CookieDough.getInstance();
+        // Party admission rolls members back through this lobby; keep parties together here.
+        if (core != null && core.getPartyManager() != null
+                && core.getPartyManager().hasOnlinePartyCompanions(cookiePlayer.getPlayer().getUniqueId())) {
+            return false;
+        }
+        return GameManager.getGames().stream()
+                .filter(BuildBattlesGame.class::isInstance)
+                .map(BuildBattlesGame.class::cast)
+                .filter(game -> game != this && game.acceptsLateJoin())
+                .sorted(java.util.Comparator.comparingInt(BuildBattlesGame::activeBuilderCount).reversed())
+                .anyMatch(game -> game.admitLateJoiner(cookiePlayer));
+    }
+
+    private synchronized int activeBuilderCount() {
+        return activePlayers.size();
+    }
+
+    private int lateJoinWindowSeconds() {
+        return BuildBattles.getInstance().getConfig().getInt("game.late-join-seconds",
+                LateJoinPolicy.DEFAULT_WINDOW_SECONDS);
+    }
+
+    synchronized boolean acceptsLateJoin() {
+        return getState() == GameState.RUNNING && !cleanupStarted
+                && LateJoinPolicy.isOpen(phase, phaseSeconds, lateJoinWindowSeconds())
+                && LateJoinPolicy.firstFreePlot(map.template().capacity(), playerByPlot.keySet()) >= 0;
+    }
+
+    /**
+     * Module-owned admission into a RUNNING match. CookieDough's normal
+     * admission is OPEN-only, so this reuses the roster restore primitive after
+     * validating a never-assigned plot, exactly like a reconnect reservation.
+     */
+    private synchronized boolean admitLateJoiner(CookiePlayer cookiePlayer) {
+        Player player = cookiePlayer.getPlayer();
+        UUID id = player.getUniqueId();
+        if (!player.isOnline() || !acceptsLateJoin() || participants.contains(id)
+                || PlayerWrapperListener.rejectPersistentRecoveryTransfer(player)
+                || !PlayerWrapperListener.isPlayerDataReady(id) || !canAdmitPlayer(player)
+                || !canRestorePlayerAfterReconnect(cookiePlayer)) return false;
+        int plot = LateJoinPolicy.firstFreePlot(map.template().capacity(), playerByPlot.keySet());
+        if (plot < 0) return false;
+        CookieDough core = CookieDough.getInstance();
+        if (core != null && core.getPracticeManager() != null) core.getPracticeManager().stop(player, false);
+        if (core != null && core.getCosmeticEffects() != null) core.getCosmeticEffects().disableLobbyFlightBeforeArena(player);
+        if (!tryTeleportPlayerSafely(player, map.template().plotCenter(map.world(), plot))) return false;
+        if (!restorePlayerAfterReconnect(cookiePlayer)) {
+            LobbyManager.teleportPlayerToLobby(cookiePlayer);
+            return false;
+        }
+        plotByPlayer.put(id, plot);
+        playerByPlot.put(plot, id);
+        voteLedger = new VoteLedger(playerByPlot); // still building: no vote has been cast yet
+        participants.add(id);
+        activePlayers.put(id, cookiePlayer);
+        stats.register(id);
+        prepareBuilder(cookiePlayer, plot, false);
+        String remaining = formatSeconds(buildSeconds() - phaseSeconds);
+        player.showTitle(Title.title(
+                Component.text(BuildBattles.themeName(player, theme), NamedTextColor.GOLD, TextDecoration.BOLD),
+                Component.text(BuildBattles.message(player, "bb.late_join.subtitle", remaining),
+                        NamedTextColor.GREEN)));
+        player.sendMessage(Component.text(BuildBattles.message(player, "bb.howto"), NamedTextColor.AQUA));
+        for (CookiePlayer other : activePlayers.values()) {
+            if (other.getPlayer().getUniqueId().equals(id) || !other.getPlayer().isOnline()) continue;
+            other.getPlayer().sendMessage(Component.text(BuildBattles.message(other.getPlayer(),
+                    "bb.late_join.announce", player.getName()), NamedTextColor.GREEN));
+        }
+        FunnelTelemetry.record(player, FunnelTelemetry.Event.MATCH_STARTED, "game=BuildBattles late_join=true");
+        BuildBattles.getInstance().getLogger().info("BuildBattles late join: game=" + getGameId()
+                + " plot=" + plot + " build_second=" + phaseSeconds);
+        return true;
+    }
 
     @Override public void removePlayer(CookiePlayer player) { removePlayer(player, "left_game"); }
 
@@ -933,6 +1112,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             themeBallot.withdraw(id);
             participants.remove(id);
             activePlayers.remove(id);
+            waitingSince.remove(id);
             stats.clear(); // waiting stats contain no durable contribution
             scoreboard.remove(player.getPlayer());
             return;

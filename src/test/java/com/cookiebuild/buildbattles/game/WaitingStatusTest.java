@@ -25,4 +25,13 @@ class WaitingStatusTest {
         assertEquals(2, status.players());
         assertEquals(8, status.capacity());
     }
+
+    @Test
+    void loneWaitingPlayerSeesSoloStartCountdownUntilHookFires() {
+        assertEquals(15, WaitingStatus.soloStartRemaining(1, 0, 15));
+        assertEquals(3, WaitingStatus.soloStartRemaining(1, 12, 15));
+        assertEquals(-1, WaitingStatus.soloStartRemaining(1, 15, 15));
+        assertEquals(-1, WaitingStatus.soloStartRemaining(2, 0, 15));
+        assertEquals(-1, WaitingStatus.soloStartRemaining(1, 0, -1));
+    }
 }
