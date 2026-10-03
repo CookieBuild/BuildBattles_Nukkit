@@ -44,6 +44,11 @@ public final class BuildGalleryService {
         public boolean eligible() {
             return GalleryCapturePolicy.eligible(builtBlocks);
         }
+
+        /** {@code buildbattle_builds.block_count}: blocks placed ("blocs posés"), same count as eligibility. */
+        public int blockCount() {
+            return GalleryCapturePolicy.blockCount(builtBlocks);
+        }
     }
 
     /** Match-wide labels of a capture; the match id is read when the row is written. */
@@ -148,11 +153,11 @@ public final class BuildGalleryService {
                         new PostgresBuildGalleryRepository.BuildRow(UUID.randomUUID(), plot.playerId(),
                                 context.matchId().get(), context.themeKey(), context.themeName(), context.outcome(),
                                 GalleryCapturePolicy.placement(context.outcome(), placement), context.builders(),
-                                plot.payload().nonAirCount(), plot.payload().sizeX(), plot.payload().sizeY(),
+                                plot.blockCount(), plot.payload().sizeX(), plot.payload().sizeY(),
                                 plot.payload().sizeZ(), data),
                         ShortCodes::next);
                 plugin.getLogger().info("Gallery build saved: code=" + inserted.shortCode()
-                        + " status=" + inserted.status() + " blocks=" + plot.payload().nonAirCount()
+                        + " status=" + inserted.status() + " placed_blocks=" + plot.blockCount()
                         + " bytes=" + data.length);
                 runOnServerThread(() -> onSaved.accept(inserted));
             } catch (RuntimeException error) {

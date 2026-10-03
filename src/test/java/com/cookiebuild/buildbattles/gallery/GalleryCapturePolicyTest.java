@@ -20,6 +20,19 @@ class GalleryCapturePolicyTest {
     }
 
     @Test
+    void blockCountIsThePlacedBlockCountNotThePayloadTotal() {
+        BuildPayload.Builder builder = new BuildPayload.Builder(3, 3, 3);
+        for (int x = 0; x < 3; x++) for (int z = 0; z < 3; z++) builder.set(x, 0, z, "minecraft:terracotta");
+        builder.set(1, 1, 1, "minecraft:oak_planks");
+        BuildGalleryService.CapturedPlot plot = new BuildGalleryService.CapturedPlot(
+                java.util.UUID.randomUUID(), builder.build(), 1);
+        assertEquals(10, plot.payload().nonAirCount());
+        assertEquals(1, plot.blockCount());
+        assertEquals(GalleryCapturePolicy.eligible(plot.builtBlocks()), plot.eligible());
+        assertEquals(0, GalleryCapturePolicy.blockCount(-3));
+    }
+
+    @Test
     void mapsMatchEndingsToContractColumns() {
         assertEquals("solo", GalleryCapturePolicy.outcomeOf(ShortHandedMatchPolicy.Outcome.SOLO_RESULT).column());
         assertEquals("forfeit",

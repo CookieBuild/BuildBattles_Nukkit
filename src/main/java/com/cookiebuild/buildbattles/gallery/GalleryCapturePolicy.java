@@ -35,6 +35,15 @@ public final class GalleryCapturePolicy {
         return builtBlocks >= MIN_BUILT_BLOCKS;
     }
 
+    /**
+     * Stored {@code block_count}: the non-air blocks above the floor inside the
+     * editable area (the eligibility count), not the payload's non-air total,
+     * which also includes the floor and the layer below it.
+     */
+    public static int blockCount(int builtBlocks) {
+        return Math.max(0, builtBlocks);
+    }
+
     /** Short-handed ending captured at match end, or null when it is not a match end. */
     public static Outcome outcomeOf(ShortHandedMatchPolicy.Outcome shortHanded) {
         if (shortHanded == null) return null;
