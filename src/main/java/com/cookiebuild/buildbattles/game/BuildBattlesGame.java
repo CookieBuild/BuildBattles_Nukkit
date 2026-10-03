@@ -3,6 +3,7 @@ package com.cookiebuild.buildbattles.game;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -31,6 +32,9 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.BoundingBox;
 
 import com.cookiebuild.buildbattles.BuildBattles;
+import com.cookiebuild.buildbattles.gallery.BuildGalleryService;
+import com.cookiebuild.buildbattles.gallery.GalleryCapturePolicy;
+import com.cookiebuild.buildbattles.gallery.PostgresBuildGalleryRepository;
 import com.cookiebuild.buildbattles.map.GameMap;
 import com.cookiebuild.buildbattles.map.MapManager;
 import com.cookiebuild.buildbattles.map.MapTemplate;
@@ -96,6 +100,8 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
     private final Set<UUID> forfeited = new LinkedHashSet<>();
     private final Map<UUID, Long> lastFloorChange = new HashMap<>();
     private final Map<UUID, Long> waitingSince = new HashMap<>();
+    /** Waiters whose transfer to a running match failed once: never retried every second. */
+    private final Set<UUID> routeFailed = new HashSet<>();
     private final List<BukkitTask> floorTasks = new ArrayList<>();
     private final Object matchPersistenceLock = new Object();
 
@@ -108,6 +114,10 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
     private int phaseSeconds;
     private int judgingPlot = -1;
     private int startingPlayers;
+    /** Build duration fixed at start (solo/multi), extended only by a late join. */
+    private int buildDurationSeconds;
+    /** Late-join window computed from the duration fixed at start. */
+    private int lateJoinWindow;
     private boolean outcomePersisted;
     private boolean cleanupStarted;
     private BukkitTask cleanupRetryTask;
@@ -233,6 +243,9 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         // One player is enough once CookieDough's solo-start hook fires.
         if (starters.isEmpty() || starters.size() > map.template().capacity()) return;
         startingPlayers = starters.size();
+        buildDurationSeconds = LateJoinPolicy.initialBuildSeconds(startingPlayers,
+                soloBuildSecondsConfig(), multiBuildSecondsConfig());
+        lateJoinWindow = configuredLateJoinWindow(buildDurationSeconds);
         waitingSince.clear();
         int plot = 0;
         for (CookiePlayer cookiePlayer : starters) {
@@ -342,6 +355,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
 
     @Override
     public void tick() {
+        if (phase == BuildPhase.WAITING) routeLoneWaiterToRunningMatch();
         super.tick();
         updateDisplay();
         if (phase == BuildPhase.WAITING || phase == BuildPhase.FINISHED) return;
@@ -565,6 +579,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             case FORFEIT_PARTICIPATION -> "bb.forfeit.finished";
             default -> "bb.solo";
         };
+        GalleryCapture gallery = captureBuilds(GalleryCapturePolicy.outcomeOf(outcome), placements);
         for (CookiePlayer cookiePlayer : activePlayers.values()) {
             Player player = cookiePlayer.getPlayer();
             if (!player.isOnline()) continue;
@@ -579,8 +594,19 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             player.showTitle(Title.title(
                     Component.text(BuildBattles.message(player, prefix + ".title"),
                             victory ? NamedTextColor.GOLD : NamedTextColor.AQUA, TextDecoration.BOLD),
-                    Component.text(BuildBattles.message(player, prefix + ".subtitle"), NamedTextColor.GRAY),
+                    Component.text(BuildBattles.message(player, outcome == ShortHandedMatchPolicy.Outcome.SOLO_RESULT
+                            && gallery.captured().contains(player.getUniqueId())
+                            ? "bb.solo.gallery_subtitle" : prefix + ".subtitle"), NamedTextColor.GRAY),
                     Title.Times.times(Duration.ofMillis(300), Duration.ofSeconds(4), Duration.ofMillis(500))));
+            if (outcome == ShortHandedMatchPolicy.Outcome.SOLO_RESULT
+                    && gallery.captured().contains(player.getUniqueId())) {
+                player.sendMessage(Component.text(BuildBattles.message(player, "bb.solo.gallery_message"),
+                        NamedTextColor.AQUA));
+            }
+            if (gallery.tooSmall().contains(player.getUniqueId())) {
+                player.sendMessage(Component.text(BuildBattles.message(player, "bb.gallery.too_small",
+                        GalleryCapturePolicy.MIN_BUILT_BLOCKS), NamedTextColor.GRAY));
+            }
             recordMatchCompleted(player);
         }
         BuildBattles.getInstance().getLogger().info("BuildBattles match " + getGameId()
@@ -596,6 +622,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         Map<UUID, Integer> placements = new HashMap<>();
         result.entries().forEach(entry -> placements.put(entry.playerId(), entry.placement()));
         Set<UUID> winners = result.winners();
+        captureBuilds(GalleryCapturePolicy.Outcome.JUDGED, placements);
         Integer bestEligiblePlot = result.winningPlot();
         Location resultLocation = bestEligiblePlot == null ? map.template().waitingSpawn(map.world())
                 : map.template().judgingLocation(map.world(), bestEligiblePlot);
@@ -1038,14 +1065,23 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         return activePlayers.size();
     }
 
-    private int lateJoinWindowSeconds() {
-        return BuildBattles.getInstance().getConfig().getInt("game.late-join-seconds",
-                LateJoinPolicy.DEFAULT_WINDOW_SECONDS);
+    /**
+     * {@code game.late-join-seconds} is the legacy fixed window: it wins only
+     * when an operator sets it explicitly. Otherwise the window is
+     * {@code game.late-join-fraction} (default 0.5) of the build duration.
+     */
+    private static int configuredLateJoinWindow(int buildSeconds) {
+        var config = BuildBattles.getInstance().getConfig();
+        if (config.isSet("game.late-join-seconds")) {
+            return config.getInt("game.late-join-seconds", LateJoinPolicy.DEFAULT_WINDOW_SECONDS);
+        }
+        return LateJoinPolicy.windowSeconds(buildSeconds,
+                config.getDouble("game.late-join-fraction", LateJoinPolicy.DEFAULT_WINDOW_FRACTION));
     }
 
     synchronized boolean acceptsLateJoin() {
         return getState() == GameState.RUNNING && !cleanupStarted
-                && LateJoinPolicy.isOpen(phase, phaseSeconds, lateJoinWindowSeconds())
+                && LateJoinPolicy.isOpen(phase, phaseSeconds, lateJoinWindow)
                 && LateJoinPolicy.firstFreePlot(map.template().capacity(), playerByPlot.keySet()) >= 0;
     }
 
@@ -1077,6 +1113,10 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         participants.add(id);
         activePlayers.put(id, cookiePlayer);
         stats.register(id);
+        int previousBuildSeconds = buildSeconds();
+        buildDurationSeconds = LateJoinPolicy.buildSecondsAfterLateJoin(previousBuildSeconds, phaseSeconds,
+                BuildBattles.getInstance().getConfig().getInt("game.late-join-min-build-seconds",
+                        LateJoinPolicy.DEFAULT_MIN_NEWCOMER_SECONDS));
         prepareBuilder(cookiePlayer, plot, false);
         String remaining = formatSeconds(buildSeconds() - phaseSeconds);
         player.showTitle(Title.title(
@@ -1088,11 +1128,111 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             if (other.getPlayer().getUniqueId().equals(id) || !other.getPlayer().isOnline()) continue;
             other.getPlayer().sendMessage(Component.text(BuildBattles.message(other.getPlayer(),
                     "bb.late_join.announce", player.getName()), NamedTextColor.GREEN));
+            if (buildSeconds() > previousBuildSeconds) {
+                other.getPlayer().sendMessage(Component.text(BuildBattles.message(other.getPlayer(),
+                        "bb.late_join.extended", remaining), NamedTextColor.AQUA));
+            }
         }
         FunnelTelemetry.record(player, FunnelTelemetry.Event.MATCH_STARTED, "game=BuildBattles late_join=true");
         BuildBattles.getInstance().getLogger().info("BuildBattles late join: game=" + getGameId()
-                + " plot=" + plot + " build_second=" + phaseSeconds);
+                + " plot=" + plot + " build_second=" + phaseSeconds + " build_seconds=" + buildSeconds());
         return true;
+    }
+
+    /**
+     * A player left waiting alone (also during the solo-start countdown) is
+     * moved into a running match that still accepts builders rather than
+     * starting another solo match. If the admission fails the player gets his
+     * waiting place back.
+     */
+    private void routeLoneWaiterToRunningMatch() {
+        if (getState() != GameState.OPEN || !isAdmissionsOpen() || getPlayerCount() != 1) return;
+        CookiePlayer waiter = getPlayers().getFirst();
+        Player player = waiter.getPlayer();
+        if (player == null || !player.isOnline() || routeFailed.contains(player.getUniqueId())) return;
+        CookieDough core = CookieDough.getInstance();
+        boolean party = core != null && core.getPartyManager() != null
+                && core.getPartyManager().hasOnlinePartyCompanions(player.getUniqueId());
+        BuildBattlesGame target = GameManager.getGames().stream()
+                .filter(BuildBattlesGame.class::isInstance)
+                .map(BuildBattlesGame.class::cast)
+                .filter(game -> game != this && game.acceptsLateJoin())
+                .max(java.util.Comparator.comparingInt(BuildBattlesGame::activeBuilderCount))
+                .orElse(null);
+        if (!LateJoinPolicy.routeLoneWaiter(getPlayerCount(), party, target != null)) return;
+        removePlayer(waiter, "late_join_transfer");
+        if (target.admitLateJoiner(waiter)) {
+            BuildBattles.getInstance().getLogger().info("BuildBattles lone waiter routed to running match: player="
+                    + player.getUniqueId() + " from=" + getGameId() + " to=" + target.getGameId());
+            return;
+        }
+        routeFailed.add(player.getUniqueId());
+        if (waiter.getState() == PlayerState.LOBBY && GameManager.getGameOfPlayer(waiter) == null
+                && !addPlayer(waiter)) {
+            LobbyManager.teleportPlayerToLobby(waiter);
+        }
+    }
+
+    private record GalleryCapture(Set<UUID> captured, Set<UUID> tooSmall) {
+        private static final GalleryCapture NONE = new GalleryCapture(Set.of(), Set.of());
+    }
+
+    /**
+     * Snapshots every builder plot for the public gallery. Reads run on the
+     * server thread, one bounded pass per plot; the database write is
+     * asynchronous and can never fail the match.
+     */
+    private GalleryCapture captureBuilds(GalleryCapturePolicy.Outcome outcome, Map<UUID, Integer> placements) {
+        BuildGalleryService gallery = BuildBattles.gallery();
+        if (gallery == null || !gallery.enabled() || outcome == null || playerByPlot.isEmpty()) {
+            return GalleryCapture.NONE;
+        }
+        long startedAt = System.nanoTime();
+        Set<UUID> captured = new HashSet<>();
+        Set<UUID> tooSmall = new HashSet<>();
+        BuildGalleryService.MatchContext context = new BuildGalleryService.MatchContext(
+                () -> {
+                    Match persisted = match;
+                    return persisted == null ? null : persisted.getId();
+                },
+                GalleryCapturePolicy.themeKey(theme), BuildBattles.englishThemeName(theme), outcome,
+                playerByPlot.size());
+        for (Map.Entry<Integer, UUID> entry : new ArrayList<>(playerByPlot.entrySet())) {
+            UUID owner = entry.getValue();
+            Integer placement = placements.get(owner);
+            try {
+                BuildGalleryService.CapturedPlot plot = gallery.captureWhenLoaded(map.world(),
+                        map.template().bounds(entry.getKey()), owner,
+                        snapshot -> gallery.submit(snapshot, context, placement,
+                                saved -> announceGalleryBuild(gallery, owner, saved)));
+                if (plot != null) (plot.eligible() ? captured : tooSmall).add(owner);
+            } catch (RuntimeException error) {
+                BuildBattles.getInstance().getLogger().warning("Gallery capture skipped for plot "
+                        + entry.getKey() + ": " + PostgresBuildGalleryRepository.rootMessage(error));
+            }
+        }
+        BuildBattles.getInstance().getLogger().info("BuildBattles gallery capture: game=" + getGameId()
+                + " outcome=" + outcome.column() + " plots=" + playerByPlot.size() + " eligible=" + captured.size()
+                + " capture_ms=" + elapsedMillis(startedAt, System.nanoTime()));
+        return new GalleryCapture(Set.copyOf(captured), Set.copyOf(tooSmall));
+    }
+
+    private void announceGalleryBuild(BuildGalleryService gallery, UUID owner,
+            PostgresBuildGalleryRepository.Inserted saved) {
+        Player player = Bukkit.getPlayer(owner);
+        if (player == null || !player.isOnline()) return;
+        if (!saved.published()) {
+            player.sendMessage(Component.text(BuildBattles.message(player, "bb.gallery.saved_private"),
+                    NamedTextColor.GRAY));
+            return;
+        }
+        String url = GalleryCapturePolicy.shareUrl(gallery.host(), saved.shortCode());
+        // Plain text for everyone; Java additionally gets a click (Bedrock cannot open chat links).
+        Component link = Component.text(BuildBattles.message(player, "bb.gallery.link", url), NamedTextColor.GOLD);
+        if (!BedrockFormSupport.isBedrock(player)) link = link.clickEvent(ClickEvent.openUrl("https://" + url));
+        player.sendMessage(link);
+        player.sendMessage(Component.text(BuildBattles.message(player, "bb.gallery.likes_hint"),
+                NamedTextColor.GRAY));
     }
 
     @Override public void removePlayer(CookiePlayer player) { removePlayer(player, "left_game"); }
@@ -1201,7 +1341,19 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         floorTasks.clear();
     }
 
-    private int buildSeconds() { return BuildBattles.getInstance().getConfig().getInt("game.build-seconds", 300); }
+    private int buildSeconds() {
+        return buildDurationSeconds > 0 ? buildDurationSeconds : multiBuildSecondsConfig();
+    }
+
+    private static int multiBuildSecondsConfig() {
+        return BuildBattles.getInstance().getConfig().getInt("game.build-seconds",
+                LateJoinPolicy.DEFAULT_MULTI_BUILD_SECONDS);
+    }
+
+    private static int soloBuildSecondsConfig() {
+        return BuildBattles.getInstance().getConfig().getInt("game.solo-build-seconds",
+                LateJoinPolicy.DEFAULT_SOLO_BUILD_SECONDS);
+    }
     private int judgingSeconds() { return BuildBattles.getInstance().getConfig().getInt("game.judging-seconds-per-plot", 12); }
     private int resultsSeconds() { return BuildBattles.getInstance().getConfig().getInt("game.results-seconds", 10); }
 

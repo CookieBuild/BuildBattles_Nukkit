@@ -34,4 +34,41 @@ public record PlotBounds(double centerX, double centerY, double centerZ,
     public int maxBlockZ() {
         return (int) Math.ceil(centerZ + halfSize - 1.0);
     }
+
+    /*
+     * Gallery capture box (release bb-gallery-20261003): the footprint is
+     * 2*halfSize+1 blocks centred on the plot's centre block, and the height
+     * runs from plot-down below to plot-up above the configured centre, i.e.
+     * 27 x 23 x 27 for the legacy map. It contains every buildable block.
+     */
+
+    public int captureMinX() {
+        return (int) Math.floor(centerX) - halfSize;
+    }
+
+    public int captureMinY() {
+        return (int) Math.floor(centerY - down);
+    }
+
+    public int captureMinZ() {
+        return (int) Math.floor(centerZ) - halfSize;
+    }
+
+    public int captureSizeX() {
+        return 2 * halfSize + 1;
+    }
+
+    public int captureSizeY() {
+        return up + down + 1;
+    }
+
+    public int captureSizeZ() {
+        return 2 * halfSize + 1;
+    }
+
+    /** A block above the floor inside the player-editable area: what counts as "built". */
+    public boolean isBuildArea(int x, int y, int z) {
+        return x >= minBlockX() && x <= maxBlockX() && z >= minBlockZ() && z <= maxBlockZ()
+                && y > floorY() && contains(x, y, z);
+    }
 }

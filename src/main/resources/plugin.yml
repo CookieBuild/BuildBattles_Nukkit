@@ -7,8 +7,8 @@ depend: [CookieDough]
 
 commands:
   buildbattles:
-    description: Join a BuildBattles match
-    usage: /buildbattles play
+    description: Join a BuildBattles match, or manage your gallery (/bb galerie on|off)
+    usage: /buildbattles [play|galerie on|off]
     aliases: [buildbattle, bb]
     permission: buildbattles.play
   bbtheme:

@@ -21,7 +21,11 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import com.cookiebuild.buildbattles.game.BuildBattlesGame;
 import com.cookiebuild.buildbattles.game.BuildPhase;
+import com.cookiebuild.buildbattles.game.LateJoinPolicy;
 import com.cookiebuild.buildbattles.game.FloorMaterialResolver;
+import com.cookiebuild.buildbattles.gallery.BuildGalleryService;
+import com.cookiebuild.buildbattles.gallery.GalleryCapturePolicy;
+import com.cookiebuild.buildbattles.gallery.GalleryJoinListener;
 import com.cookiebuild.buildbattles.map.MapManager;
 import com.cookiebuild.buildbattles.security.BuildSafetyPolicy;
 import com.cookiebuild.cookiedough.CookieDough;
@@ -57,9 +61,13 @@ public final class BuildBattles extends JavaPlugin {
     private NamespacedKey entityOwnerKey;
     private NamespacedKey entityCategoryKey;
     private StandbyArenaService<MapManager.PreparedMap, BuildBattlesGame> arenas;
+    private BuildGalleryService gallery;
     private boolean shuttingDown;
 
     public static BuildBattles getInstance() { return instance; }
+
+    /** Gallery capture and settings; null while the plugin is disabled. */
+    public static BuildGalleryService gallery() { return instance == null ? null : instance.gallery; }
 
     public static boolean registerNewGame() {
         return instance != null && !instance.shuttingDown && instance.arenas.request(0L);
@@ -133,7 +141,9 @@ public final class BuildBattles extends JavaPlugin {
                 () -> GameManager.getGames().stream().filter(BuildBattlesGame.class::isInstance)
                         .anyMatch(game -> game.getState() == GameState.OPEN),
                 GameManager::addGame, BuildBattlesGame::shutdown, getLogger(), true);
+        gallery = new BuildGalleryService(this);
         getServer().getPluginManager().registerEvents(new com.cookiebuild.buildbattles.listener.BuildBattlesListener(), this);
+        getServer().getPluginManager().registerEvents(new GalleryJoinListener(this, gallery), this);
         registerCommands();
         if (!registerNewGame()) {
             getLogger().warning("No game registered; NPC and Quick Play stay fail-closed.");
@@ -142,7 +152,11 @@ public final class BuildBattles extends JavaPlugin {
 
     private void migrateConfig() {
         int version = getConfig().getInt("config-version", 0);
-        if (version >= 3) return;
+        if (version >= 4) return;
+        if (version == 3) {
+            migrateConfigToGallery();
+            return;
+        }
         if (version < 2) {
             // Version 1 contained placeholders written before the recovered world
             // was available. They are unsafe on existing installations because the
@@ -164,6 +178,27 @@ public final class BuildBattles extends JavaPlugin {
         getConfig().set("config-version", 3);
         saveConfig();
         getLogger().info("Migrated BuildBattles safety settings to config version 3");
+        migrateConfigToGallery();
+    }
+
+    /**
+     * Version 4 (bb-gallery-20261003): 180 s solo builds, a late-join window of
+     * half the build phase and the gallery. The old default fixed window
+     * (90 s) is dropped so the fraction applies; any other explicit value is
+     * kept and still wins.
+     */
+    private void migrateConfigToGallery() {
+        if (getConfig().getInt("game.late-join-seconds", -1) == LateJoinPolicy.DEFAULT_WINDOW_SECONDS) {
+            getConfig().set("game.late-join-seconds", null);
+        }
+        setIfMissing("game.solo-build-seconds", LateJoinPolicy.DEFAULT_SOLO_BUILD_SECONDS);
+        setIfMissing("game.late-join-fraction", LateJoinPolicy.DEFAULT_WINDOW_FRACTION);
+        setIfMissing("game.late-join-min-build-seconds", LateJoinPolicy.DEFAULT_MIN_NEWCOMER_SECONDS);
+        setIfMissing("gallery.enabled", true);
+        setIfMissing("gallery.host", BuildGalleryService.DEFAULT_HOST);
+        getConfig().set("config-version", 4);
+        saveConfig();
+        getLogger().info("Migrated BuildBattles settings to config version 4 (solo timer, late join, gallery)");
     }
 
     private void setIfMissing(String path, Object value) {
@@ -173,6 +208,10 @@ public final class BuildBattles extends JavaPlugin {
     private void registerCommands() {
         Objects.requireNonNull(getCommand("buildbattles")).setExecutor((sender, command, label, args) -> {
             if (!(sender instanceof Player player)) return true;
+            if (args.length > 0 && (args[0].equalsIgnoreCase("galerie") || args[0].equalsIgnoreCase("gallery"))) {
+                handleGalleryCommand(player, args);
+                return true;
+            }
             if (args.length > 0 && args[0].equalsIgnoreCase("replay")) {
                 FunnelTelemetry.record(player, FunnelTelemetry.Event.REMATCH_CLICKED, "game=BuildBattles");
                 CookiePlayer cookiePlayer = PlayerManager.getPlayer(player);
@@ -243,6 +282,44 @@ public final class BuildBattles extends JavaPlugin {
             if (!(sender instanceof Player player)) return true;
             giveBuildPalette(player);
             return true;
+        });
+    }
+
+    /** {@code /bb galerie [on|off]} (alias {@code /buildbattles gallery}). */
+    private void handleGalleryCommand(Player player, String[] args) {
+        UUID playerId = player.getUniqueId();
+        if (args.length < 2) {
+            gallery.readOptOut(playerId, optOut -> {
+                Player online = getServer().getPlayer(playerId);
+                if (online == null) return;
+                if (optOut == null) {
+                    online.sendMessage(Component.text(message(online, "bb.gallery.unavailable"), NamedTextColor.RED));
+                    return;
+                }
+                online.sendMessage(Component.text(message(online, optOut ? "bb.gallery.status.off"
+                        : "bb.gallery.status.on"), NamedTextColor.YELLOW));
+                online.sendMessage(Component.text(message(online, "bb.gallery.usage"), NamedTextColor.GRAY));
+            });
+            return;
+        }
+        String choice = args[1].toLowerCase(Locale.ROOT);
+        boolean optOut;
+        if (choice.equals("off") || choice.equals("non")) optOut = true;
+        else if (choice.equals("on") || choice.equals("oui")) optOut = false;
+        else {
+            player.sendMessage(Component.text(message(player, "bb.gallery.usage"), NamedTextColor.RED));
+            return;
+        }
+        gallery.setOptOut(playerId, optOut, result -> {
+            Player online = getServer().getPlayer(playerId);
+            if (online == null) return;
+            if (result != BuildGalleryService.OptOutResult.SAVED) {
+                online.sendMessage(Component.text(message(online, "bb.gallery.unavailable"), NamedTextColor.RED));
+                return;
+            }
+            online.sendMessage(Component.text(message(online, optOut ? "bb.gallery.off" : "bb.gallery.on",
+                    GalleryCapturePolicy.galleryUrl(gallery.host())),
+                    optOut ? NamedTextColor.YELLOW : NamedTextColor.GREEN));
         });
     }
 
@@ -322,11 +399,12 @@ public final class BuildBattles extends JavaPlugin {
     }
 
     static String themeMessageKey(String theme) {
-        if (theme == null || theme.isBlank()) return "bb.theme.name.unknown";
-        String slug = theme.trim().toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9]+", "_")
-                .replaceAll("^_+|_+$", "");
-        return "bb.theme.name." + slug;
+        return "bb.theme.name." + GalleryCapturePolicy.themeKey(theme);
+    }
+
+    /** English display name of a theme: the gallery's {@code theme_name} fallback. */
+    public static String englishThemeName(String theme) {
+        return themeNameForLocale(Locale.ENGLISH, theme);
     }
 
     private static String resolveMessage(Locale locale, String key, Object... arguments) {

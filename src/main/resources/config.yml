@@ -1,4 +1,4 @@
-config-version: 3
+config-version: 4
 
 maps:
   legacy:
@@ -23,14 +23,27 @@ maps:
       - [101.5, 5.5, 70.5, 0.0]
 
 game:
+  # Build phase of a match that starts with two or more builders.
   build-seconds: 300
+  # Build phase of a match that starts with a single builder.
+  solo-build-seconds: 180
   judging-seconds-per-plot: 12
   results-seconds: 10
   reconnect-grace-seconds: 60
-  # A queued player joins a running match on a free plot during the first
-  # seconds of its build phase instead of waiting alone in an empty lobby.
-  late-join-seconds: 90
+  # A queued player joins a running match on a free plot during this share of
+  # its build phase (duration fixed at start) instead of waiting alone in an
+  # empty lobby. The legacy fixed `late-join-seconds` still wins if set.
+  late-join-fraction: 0.5
+  # When someone joins late, the build timer becomes max(current end,
+  # now + this many seconds): nobody loses time, the newcomer gets at least 2 min.
+  late-join-min-build-seconds: 120
   theme-candidates: 3
+
+# Public Build Battle gallery (tables created by the website migration 0024).
+gallery:
+  enabled: true
+  # Shown as plain text: <host>/b/<code> for a build, <host>/builds for the gallery.
+  host: cookie-build.com
 
 floor:
   cooldown-seconds: 5
