@@ -14,7 +14,8 @@ class WaitingMessagesTest {
         ResourceBundle bundle = ResourceBundle.getBundle("buildbattles_messages", Locale.ENGLISH);
 
         assertEquals("WAITING LOBBY", bundle.getString("bb.waiting.title"));
-        assertEquals("Waiting for players", bundle.getString("bb.phase.waiting"));
+        // A lone builder starts after 15 s: the phase is "getting ready", not "waiting for players".
+        assertEquals("Getting ready", bundle.getString("bb.phase.waiting"));
         assertTrue(bundle.getString("bb.waiting.players").startsWith("Waiting for players"));
         assertTrue(bundle.getString("bb.waiting.starting").startsWith("Starting in {0}s"));
         assertTrue(bundle.getString("bb.waiting.area").contains("Builder Briefing"));

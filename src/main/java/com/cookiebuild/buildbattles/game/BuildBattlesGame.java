@@ -99,7 +99,8 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
     private final Map<UUID, Long> disconnectedAt = new HashMap<>();
     private final Set<UUID> forfeited = new LinkedHashSet<>();
     private final Map<UUID, Long> lastFloorChange = new HashMap<>();
-    private final Map<UUID, Long> waitingSince = new HashMap<>();
+    /** Builders who chose /bb galerie off (read asynchronously at start): their end screen stays private. */
+    private final Set<UUID> galleryOptedOut = java.util.concurrent.ConcurrentHashMap.newKeySet();
     /** Waiters whose transfer to a running match failed once: never retried every second. */
     private final Set<UUID> routeFailed = new HashSet<>();
     private final List<BukkitTask> floorTasks = new ArrayList<>();
@@ -172,7 +173,6 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         participants.add(id);
         activePlayers.put(id, cookiePlayer);
         stats.register(id);
-        waitingSince.put(id, System.currentTimeMillis());
         try {
             prepareWaitingPlayer(cookiePlayer);
             return true;
@@ -180,7 +180,6 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             themeBallot.withdraw(id);
             participants.remove(id);
             activePlayers.remove(id);
-            waitingSince.remove(id);
             super.removePlayer(cookiePlayer, "admission_failed");
             cookiePlayer.setState(PlayerState.LOBBY);
             return false;
@@ -246,12 +245,12 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         buildDurationSeconds = LateJoinPolicy.initialBuildSeconds(startingPlayers,
                 soloBuildSecondsConfig(), multiBuildSecondsConfig());
         lateJoinWindow = configuredLateJoinWindow(buildDurationSeconds);
-        waitingSince.clear();
         int plot = 0;
         for (CookiePlayer cookiePlayer : starters) {
             UUID id = cookiePlayer.getPlayer().getUniqueId();
             plotByPlayer.put(id, plot);
             playerByPlot.put(plot, id);
+            prefetchGalleryChoice(id);
             plot++;
         }
         voteLedger = new VoteLedger(playerByPlot);
@@ -397,8 +396,9 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             if (phase == BuildPhase.WAITING) {
                 WaitingStatus waiting = WaitingStatus.from(getPlayers().size(), getCapacity(), getMinimumPlayers(),
                         getStartTimer(), inQuickStart ? QUICK_START_DELAY_SECONDS : START_DELAY_SECONDS);
-                int soloStartIn = waiting.isCountingDown() ? -1 : WaitingStatus.soloStartRemaining(
-                        waiting.players(), waitedSeconds(player.getUniqueId()), soloStartAfterSeconds());
+                // Seconds until the solo match really starts (solo delay + countdown), so the
+                // action bar hands over to "Starting in N s" without jumping back up.
+                int soloStartIn = waiting.isCountingDown() ? -1 : getSoloStartEtaSeconds();
                 String status = waiting.isCountingDown()
                         ? BuildBattles.message(player, "bb.waiting.starting", waiting.secondsRemaining(),
                                 waiting.players(), waiting.capacity())
@@ -424,16 +424,19 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
                                     getPlayers().size(), getCapacity())
                             : "§6" + BuildBattles.message(player, "bb.scoreboard.time", formatSeconds(remaining)),
                     "§6" + BuildBattles.message(player, "bb.scoreboard.blocks", snapshot.blocksPlaced()),
-                    phase == BuildPhase.WAITING ? "§b" + BuildBattles.message(player, "bb.waiting.area_short")
-                            : judgingPlot >= 0 ? "§6" + BuildBattles.message(player, "bb.scoreboard.plot",
-                                    judgingPlot + 1, playerByPlot.size())
-                                    : "§7" + BuildBattles.message(player, "bb.scoreboard.floor_hint")));
+                    scoreboardFooter(player)));
         }
     }
 
-    private long waitedSeconds(UUID playerId) {
-        Long since = waitingSince.get(playerId);
-        return since == null ? 0L : Math.max(0L, (System.currentTimeMillis() - since) / 1000L);
+    /** Last sidebar line: what the player can do in the current phase (nothing on the end screen). */
+    private String scoreboardFooter(Player player) {
+        return switch (phase) {
+            case WAITING -> "§b" + BuildBattles.message(player, "bb.waiting.area_short");
+            case BUILDING -> "§7" + BuildBattles.message(player, "bb.scoreboard.floor_hint");
+            case JUDGING -> judgingPlot >= 0 ? "§6" + BuildBattles.message(player, "bb.scoreboard.plot",
+                    judgingPlot + 1, playerByPlot.size()) : " ";
+            case RESULTS, FINISHED -> " ";
+        };
     }
 
     @Override
@@ -591,18 +594,15 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             player.setFlying(true);
             Integer plot = plotByPlayer.get(player.getUniqueId());
             if (plot != null) player.teleport(map.template().judgingLocation(map.world(), plot));
+            boolean galleryBound = outcome == ShortHandedMatchPolicy.Outcome.SOLO_RESULT
+                    && gallery.captured().contains(player.getUniqueId())
+                    && !galleryOptedOut.contains(player.getUniqueId());
             player.showTitle(Title.title(
                     Component.text(BuildBattles.message(player, prefix + ".title"),
                             victory ? NamedTextColor.GOLD : NamedTextColor.AQUA, TextDecoration.BOLD),
-                    Component.text(BuildBattles.message(player, outcome == ShortHandedMatchPolicy.Outcome.SOLO_RESULT
-                            && gallery.captured().contains(player.getUniqueId())
+                    Component.text(BuildBattles.message(player, galleryBound
                             ? "bb.solo.gallery_subtitle" : prefix + ".subtitle"), NamedTextColor.GRAY),
                     Title.Times.times(Duration.ofMillis(300), Duration.ofSeconds(4), Duration.ofMillis(500))));
-            if (outcome == ShortHandedMatchPolicy.Outcome.SOLO_RESULT
-                    && gallery.captured().contains(player.getUniqueId())) {
-                player.sendMessage(Component.text(BuildBattles.message(player, "bb.solo.gallery_message"),
-                        NamedTextColor.AQUA));
-            }
             if (gallery.tooSmall().contains(player.getUniqueId())) {
                 player.sendMessage(Component.text(BuildBattles.message(player, "bb.gallery.too_small",
                         GalleryCapturePolicy.MIN_BUILT_BLOCKS), NamedTextColor.GRAY));
@@ -1107,8 +1107,10 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             LobbyManager.teleportPlayerToLobby(cookiePlayer);
             return false;
         }
+        int buildersBefore = remainingBuilders();
         plotByPlayer.put(id, plot);
         playerByPlot.put(plot, id);
+        prefetchGalleryChoice(id);
         voteLedger = new VoteLedger(playerByPlot); // still building: no vote has been cast yet
         participants.add(id);
         activePlayers.put(id, cookiePlayer);
@@ -1128,6 +1130,12 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             if (other.getPlayer().getUniqueId().equals(id) || !other.getPlayer().isOnline()) continue;
             other.getPlayer().sendMessage(Component.text(BuildBattles.message(other.getPlayer(),
                     "bb.late_join.announce", player.getName()), NamedTextColor.GREEN));
+            if (buildersBefore == 1) {
+                // The lone builder was told "no vote in solo": with two builders the
+                // match now ends with the normal rating phase.
+                other.getPlayer().sendMessage(Component.text(BuildBattles.message(other.getPlayer(),
+                        "bb.late_join.rating_on"), NamedTextColor.AQUA));
+            }
             if (buildSeconds() > previousBuildSeconds) {
                 other.getPlayer().sendMessage(Component.text(BuildBattles.message(other.getPlayer(),
                         "bb.late_join.extended", remaining), NamedTextColor.AQUA));
@@ -1182,6 +1190,15 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
      * server thread, one bounded pass per plot; the database write is
      * asynchronous and can never fail the match.
      */
+    /** Reads /bb galerie off asynchronously so the end screen never promises a private build to the gallery. */
+    private void prefetchGalleryChoice(UUID playerId) {
+        BuildGalleryService gallery = BuildBattles.gallery();
+        if (gallery == null || !gallery.enabled() || playerId == null) return;
+        gallery.readOptOut(playerId, optedOut -> {
+            if (Boolean.TRUE.equals(optedOut)) galleryOptedOut.add(playerId);
+        });
+    }
+
     private GalleryCapture captureBuilds(GalleryCapturePolicy.Outcome outcome, Map<UUID, Integer> placements) {
         BuildGalleryService gallery = BuildBattles.gallery();
         if (gallery == null || !gallery.enabled() || outcome == null || playerByPlot.isEmpty()) {
@@ -1204,7 +1221,8 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
                 BuildGalleryService.CapturedPlot plot = gallery.captureWhenLoaded(map.world(),
                         map.template().bounds(entry.getKey()), owner,
                         snapshot -> gallery.submit(snapshot, context, placement,
-                                saved -> announceGalleryBuild(gallery, owner, saved)));
+                                saved -> announceGalleryBuild(gallery, owner, saved,
+                                        outcome == GalleryCapturePolicy.Outcome.SOLO)));
                 if (plot != null) (plot.eligible() ? captured : tooSmall).add(owner);
             } catch (RuntimeException error) {
                 BuildBattles.getInstance().getLogger().warning("Gallery capture skipped for plot "
@@ -1217,14 +1235,22 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         return new GalleryCapture(Set.copyOf(captured), Set.copyOf(tooSmall));
     }
 
+    /**
+     * Runs once the row is stored: the "published in the gallery" notice is
+     * sent only now, so an opted-out or failed capture never claims it.
+     */
     private void announceGalleryBuild(BuildGalleryService gallery, UUID owner,
-            PostgresBuildGalleryRepository.Inserted saved) {
+            PostgresBuildGalleryRepository.Inserted saved, boolean solo) {
         Player player = Bukkit.getPlayer(owner);
         if (player == null || !player.isOnline()) return;
         if (!saved.published()) {
             player.sendMessage(Component.text(BuildBattles.message(player, "bb.gallery.saved_private"),
                     NamedTextColor.GRAY));
             return;
+        }
+        if (solo) {
+            player.sendMessage(Component.text(BuildBattles.message(player, "bb.solo.gallery_message"),
+                    NamedTextColor.AQUA));
         }
         String url = GalleryCapturePolicy.shareUrl(gallery.host(), saved.shortCode());
         // Plain text for everyone; Java additionally gets a click (Bedrock cannot open chat links).
@@ -1252,7 +1278,6 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             themeBallot.withdraw(id);
             participants.remove(id);
             activePlayers.remove(id);
-            waitingSince.remove(id);
             stats.clear(); // waiting stats contain no durable contribution
             scoreboard.remove(player.getPlayer());
             return;

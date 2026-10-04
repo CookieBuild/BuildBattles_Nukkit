@@ -19,6 +19,8 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
 final class BuildBattlesScoreboard {
+    /** Readable mode name (same in every locale), never the internal id "BuildBattles". */
+    static final String TITLE = "Build Battle";
     private static final String[] ENTRIES = {"§0", "§1", "§2", "§3", "§4", "§5", "§6", "§7"};
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacySection();
     private record View(Scoreboard scoreboard, Objective objective, Team[] lines) {}
@@ -52,7 +54,7 @@ final class BuildBattlesScoreboard {
         if (manager == null) return null;
         Scoreboard board = manager.getNewScoreboard();
         Objective objective = board.registerNewObjective("buildbattles", Criteria.DUMMY,
-                Component.text("BuildBattles", NamedTextColor.GOLD));
+                Component.text(TITLE, NamedTextColor.GOLD, net.kyori.adventure.text.format.TextDecoration.BOLD));
         objective.setDisplaySlot(DisplaySlot.SIDEBAR);
         Team[] lines = new Team[ENTRIES.length];
         for (int index = 0; index < ENTRIES.length; index++) {

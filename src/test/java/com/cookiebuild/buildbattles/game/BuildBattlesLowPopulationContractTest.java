@@ -53,12 +53,13 @@ class BuildBattlesLowPopulationContractTest {
     @Test
     void lowPopulationCopyExistsInEveryShippedLocale() {
         for (Locale locale : List.of(Locale.ENGLISH, Locale.FRENCH, Locale.of("es"), Locale.of("pt", "BR"),
-                Locale.of("bg"), Locale.of("hi"), Locale.GERMAN, Locale.of("pa"))) {
+                Locale.of("bg"), Locale.of("hi"), Locale.GERMAN, Locale.ITALIAN, Locale.of("pa"))) {
             ResourceBundle bundle = ResourceBundle.getBundle("buildbattles_messages", locale,
                     BuildBattlesLowPopulationContractTest.class.getClassLoader(), NO_FALLBACK);
             for (String key : List.of("bb.waiting.solo", "bb.howto", "bb.howto.solo", "bb.late_join.subtitle",
                     "bb.late_join.announce", "bb.solo.title", "bb.solo.subtitle", "bb.forfeit.victory.title",
-                    "bb.forfeit.victory.subtitle", "bb.forfeit.finished.title", "bb.forfeit.finished.subtitle")) {
+                    "bb.forfeit.victory.subtitle", "bb.forfeit.finished.title", "bb.forfeit.finished.subtitle",
+                    "bb.late_join.rating_on")) {
                 assertTrue(bundle.containsKey(key) && !bundle.getString(key).isBlank(), locale + " " + key);
             }
         }
