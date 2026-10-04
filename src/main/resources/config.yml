@@ -67,6 +67,8 @@ rewards:
   participation-xp: 20
   victory-coins: 20
   victory-xp: 80
+  # Non-winners must place this many blocks to earn the reward (stops idle solo farming).
+  minimum-blocks-placed: 10
 
 themes:
   - Farm

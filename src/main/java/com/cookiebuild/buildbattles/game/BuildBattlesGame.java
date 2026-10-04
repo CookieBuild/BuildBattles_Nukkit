@@ -711,6 +711,14 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         for (UUID playerId : participants) {
             if (forfeited.contains(playerId)) continue;
             boolean won = winners.contains(playerId);
+            int minimumBlocks = BuildBattles.getInstance().getConfig().getInt("rewards.minimum-blocks-placed",
+                    RewardEligibilityPolicy.DEFAULT_MIN_BLOCKS_PLACED);
+            if (!RewardEligibilityPolicy.earnsReward(won, stats.snapshot(playerId).blocksPlaced(), minimumBlocks)) {
+                Player idle = Bukkit.getPlayer(playerId);
+                if (idle != null) idle.sendMessage(Component.text(
+                        BuildBattles.message(idle, "bb.reward.idle", minimumBlocks), NamedTextColor.GRAY));
+                continue;
+            }
             int coins = BuildBattles.getInstance().getConfig().getInt("rewards.participation-coins", 5)
                     + (won ? BuildBattles.getInstance().getConfig().getInt("rewards.victory-coins", 20) : 0);
             int xp = BuildBattles.getInstance().getConfig().getInt("rewards.participation-xp", 20)
