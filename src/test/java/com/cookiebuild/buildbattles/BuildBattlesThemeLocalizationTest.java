@@ -52,7 +52,10 @@ class BuildBattlesThemeLocalizationTest {
 
     @Test
     void partialAndUnknownLocalesUseReadableEnglishInsteadOfTechnicalKeys() {
+        // Punjabi is shipped partially: missing keys fall back to readable English.
         assertEquals("Blocks: §a12", BuildBattles.messageForLocale(
+                Locale.of("pa"), "bb.scoreboard.blocks", 12));
+        assertEquals("Blöcke: §a12", BuildBattles.messageForLocale(
                 Locale.GERMAN, "bb.scoreboard.blocks", 12));
         assertEquals("Close", BuildBattles.messageForLocale(
                 Locale.JAPANESE, "bb.form.close"));

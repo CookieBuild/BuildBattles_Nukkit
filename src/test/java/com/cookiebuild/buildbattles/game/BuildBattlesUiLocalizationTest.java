@@ -24,7 +24,7 @@ class BuildBattlesUiLocalizationTest {
     void completePlayerLocalesHaveExactKeyAndPlaceholderParity() {
         ResourceBundle english = bundle(Locale.ENGLISH);
         for (Locale locale : Set.of(Locale.FRENCH, Locale.of("es"), Locale.of("pt", "BR"),
-                Locale.of("bg"), Locale.of("hi"))) {
+                Locale.of("bg"), Locale.of("hi"), Locale.GERMAN, Locale.ITALIAN)) {
             ResourceBundle translated = bundle(locale);
             assertEquals(english.keySet(), translated.keySet(), "keys for " + locale);
             for (String key : english.keySet()) {
