@@ -38,6 +38,10 @@ game:
   # now + this many seconds): nobody loses time, the newcomer gets at least 2 min.
   late-join-min-build-seconds: 120
   theme-candidates: 3
+  # Build times (minutes) proposed in the waiting room next to the theme vote.
+  # Most votes wins, a tie picks the shortest; with no vote the match keeps
+  # build-seconds / solo-build-seconds.
+  duration-options-minutes: [5, 10, 15]
 
 # Public Build Battle gallery (tables created by the website migration 0024).
 gallery:

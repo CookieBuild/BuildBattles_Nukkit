@@ -75,6 +75,8 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
     public static final String MINIGAME_KEY = "buildbattles";
     /** A lone player waiting this long may start a solo match (CookieDough hook). */
     static final int SOLO_START_AFTER_SECONDS = 15;
+    /** First hotbar slot of the build-time clocks (theme papers use 0-2). */
+    static final int DURATION_FIRST_SLOT = 4;
 
     public enum FloorChangeResult {
         STARTED,
@@ -86,6 +88,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
 
     private final GameMap map;
     private final ThemeBallot themeBallot;
+    private final DurationBallot durationBallot;
     private final MatchService matchService = new MatchService(null);
     private final MinigameProgressionService progression = CookieDough.createMinigameProgressionService();
     private final BuildStats stats = new BuildStats();
@@ -140,6 +143,8 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         themeBallot = new ThemeBallot(themes,
                 BuildBattles.getInstance().getConfig().getInt("game.theme-candidates", 3),
                 ThreadLocalRandom.current());
+        durationBallot = new DurationBallot(
+                BuildBattles.getInstance().getConfig().getIntegerList("game.duration-options-minutes"));
     }
 
     private static BuildResourceBudget createResourceBudget() {
@@ -178,6 +183,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             return true;
         } catch (RuntimeException error) {
             themeBallot.withdraw(id);
+            durationBallot.withdraw(id);
             participants.remove(id);
             activePlayers.remove(id);
             super.removePlayer(cookiePlayer, "admission_failed");
@@ -203,6 +209,20 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             paper.setItemMeta(meta);
             player.getInventory().setItem(index, paper);
         }
+        // Slots 4-6: slot 8 stays CookieDough's leave-queue compass (reinstalled after this setup).
+        List<Integer> durations = durationBallot.options();
+        for (int index = 0; index < durations.size() && DURATION_FIRST_SLOT + index < 8; index++) {
+            int minutes = durations.get(index);
+            ItemStack clock = new ItemStack(Material.CLOCK, Math.min(64, minutes));
+            ItemMeta meta = clock.getItemMeta();
+            meta.displayName(Component.text(BuildBattles.message(player, "bb.duration.option", minutes),
+                    NamedTextColor.LIGHT_PURPLE));
+            meta.lore(List.of(MenuLore.detail(BuildBattles.message(player, "bb.duration.vote_item_lore"))));
+            meta.getPersistentDataContainer().set(BuildBattles.getInstance().getDurationKey(),
+                    PersistentDataType.INTEGER, minutes);
+            clock.setItemMeta(meta);
+            player.getInventory().setItem(DURATION_FIRST_SLOT + index, clock);
+        }
         player.showTitle(Title.title(
                 Component.text(BuildBattles.message(player, "bb.waiting.title"), NamedTextColor.GOLD,
                         TextDecoration.BOLD),
@@ -210,7 +230,36 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
                 Title.Times.times(Duration.ofMillis(250), Duration.ofSeconds(3), Duration.ofMillis(500))));
         player.sendMessage(Component.text(BuildBattles.message(player, "bb.waiting.area"), NamedTextColor.AQUA));
         player.sendMessage(themePrompt(player));
-        BuildBattlesBedrockForms.openTheme(player, themeBallot.candidates(), theme -> voteTheme(player, theme));
+        player.sendMessage(durationPrompt(player));
+        // Bedrock shows one form at a time: the build-time form follows a theme vote.
+        BuildBattlesBedrockForms.openTheme(player, themeBallot.candidates(), theme -> {
+            voteTheme(player, theme);
+            if (phase == BuildPhase.WAITING && participants.contains(player.getUniqueId())) {
+                BuildBattlesBedrockForms.openDuration(player, durationBallot.options(),
+                        minutes -> voteDuration(player, minutes));
+            }
+        });
+    }
+
+    private Component durationPrompt(Player player) {
+        Component prompt = Component.text(BuildBattles.message(player, "bb.duration.prompt") + " ",
+                NamedTextColor.YELLOW);
+        for (int minutes : durationBallot.options()) {
+            prompt = prompt.append(Component.text("[" + BuildBattles.message(player, "bb.duration.option", minutes)
+                            + "] ", NamedTextColor.LIGHT_PURPLE)
+                    .clickEvent(ClickEvent.runCommand("/bbduration " + minutes))
+                    .hoverEvent(HoverEvent.showText(Component.text(
+                            BuildBattles.message(player, "bb.duration.vote_hover", minutes)))));
+        }
+        return prompt;
+    }
+
+    public boolean voteDuration(Player player, int minutes) {
+        if (phase != BuildPhase.WAITING || !participants.contains(player.getUniqueId())) return false;
+        boolean accepted = durationBallot.vote(player.getUniqueId(), minutes);
+        if (accepted) player.sendMessage(Component.text(
+                BuildBattles.message(player, "bb.duration.recorded", minutes), NamedTextColor.GREEN));
+        return accepted;
     }
 
     private Component themePrompt(Player player) {
@@ -242,8 +291,8 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         // One player is enough once CookieDough's solo-start hook fires.
         if (starters.isEmpty() || starters.size() > map.template().capacity()) return;
         startingPlayers = starters.size();
-        buildDurationSeconds = LateJoinPolicy.initialBuildSeconds(startingPlayers,
-                soloBuildSecondsConfig(), multiBuildSecondsConfig());
+        buildDurationSeconds = durationBallot.winnerSeconds(LateJoinPolicy.initialBuildSeconds(startingPlayers,
+                soloBuildSecondsConfig(), multiBuildSecondsConfig()));
         lateJoinWindow = configuredLateJoinWindow(buildDurationSeconds);
         int plot = 0;
         for (CookiePlayer cookiePlayer : starters) {
@@ -268,12 +317,17 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         String howTo = startingPlayers == 1 ? "bb.howto.solo" : "bb.howto";
         activePlayers.values().forEach(player -> player.getPlayer().sendMessage(Component.text(
                 BuildBattles.message(player.getPlayer(), howTo), NamedTextColor.AQUA)));
+        String buildTime = formatSeconds(buildDurationSeconds);
+        activePlayers.values().forEach(player -> player.getPlayer().sendMessage(Component.text(
+                BuildBattles.message(player.getPlayer(), "bb.duration.chosen", buildTime), NamedTextColor.GOLD)));
         long finishedAt = System.nanoTime();
         BuildBattles.getInstance().getLogger().info("BuildBattles match start timing: game=" + getGameId()
                 + " roster_ms=" + elapsedMillis(startedAt, rosterReadyAt)
                 + " player_prepare_ms=" + elapsedMillis(rosterReadyAt, playersReadyAt)
                 + " telemetry_schedule_and_titles_ms=" + elapsedMillis(playersReadyAt, finishedAt)
-                + " total_ms=" + elapsedMillis(startedAt, finishedAt));
+                + " total_ms=" + elapsedMillis(startedAt, finishedAt)
+                + " build_seconds=" + buildDurationSeconds + " duration_votes=" + durationBallot.options().stream()
+                        .map(minutes -> minutes + "m:" + durationBallot.count(minutes)).toList());
     }
 
     private static long elapsedMillis(long startedAt, long finishedAt) {
@@ -1284,6 +1338,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         if (phase == BuildPhase.WAITING) {
             if (getPlayers().contains(player)) super.removePlayer(player, reason);
             themeBallot.withdraw(id);
+            durationBallot.withdraw(id);
             participants.remove(id);
             activePlayers.remove(id);
             stats.clear(); // waiting stats contain no durable contribution

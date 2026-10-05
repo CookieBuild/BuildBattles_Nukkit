@@ -61,7 +61,7 @@ import com.cookiebuild.cookiedough.player.PlayerManager;
 
 public final class BuildBattlesListener implements Listener {
     private static final Set<String> ALLOWED_COMMANDS = Set.of(
-            "floor", "bbtheme", "bbvote", "buildbattles", "buildbattle", "bb",
+            "floor", "bbtheme", "bbduration", "bbvote", "buildbattles", "buildbattle", "bb",
             "bbitems", "lobby", "hub", "feedback", "party", "msg", "tell", "reply");
     private PendingSpawn pendingSpawn;
 
@@ -147,6 +147,16 @@ public final class BuildBattlesListener implements Listener {
                 BuildBattlesGame themeGame = BuildBattles.findGame(event.getPlayer());
                 if (themeGame == null || !themeGame.voteTheme(event.getPlayer(), theme)) {
                     event.getPlayer().sendMessage(BuildBattles.message(event.getPlayer(), "bb.theme.invalid"));
+                }
+                return;
+            }
+            if (data.has(BuildBattles.getInstance().getDurationKey(), PersistentDataType.INTEGER)) {
+                if (!isVoteUseAction(event.getAction())) return;
+                event.setCancelled(true);
+                Integer minutes = data.get(BuildBattles.getInstance().getDurationKey(), PersistentDataType.INTEGER);
+                BuildBattlesGame durationGame = BuildBattles.findGame(event.getPlayer());
+                if (durationGame == null || minutes == null || !durationGame.voteDuration(event.getPlayer(), minutes)) {
+                    event.getPlayer().sendMessage(BuildBattles.message(event.getPlayer(), "bb.duration.invalid"));
                 }
                 return;
             }

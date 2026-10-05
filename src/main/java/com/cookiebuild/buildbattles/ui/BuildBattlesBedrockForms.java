@@ -15,7 +15,7 @@ import com.cookiebuild.cookiedough.ui.BedrockFormSupport;
 import com.cookiebuild.cookiedough.ui.BedrockMenuSessionRegistry;
 import com.cookiebuild.cookiedough.ui.MainThreadPlayerAction;
 
-/** Native forms over BuildBattles' existing guarded theme, rating and palette actions. */
+/** Native forms over BuildBattles' existing guarded theme, build-time, rating and palette actions. */
 public final class BuildBattlesBedrockForms {
     static final String MODE_IMAGE = "modes/buildbattles";
     static final String PALETTE_IMAGE = "actions/palette";
@@ -36,6 +36,33 @@ public final class BuildBattlesBedrockForms {
                 .content(BuildBattles.message(player, "bb.form.theme.content"));
         options.forEach(theme -> BedrockFormImages.button(form,
                 BedrockButtonText.format(BuildBattles.themeName(player, theme)), MODE_IMAGE));
+        BedrockFormImages.button(form, BedrockButtonText.format(
+                BuildBattles.message(player, "bb.form.close")), CLOSE_IMAGE);
+        form.validResultHandler(response -> {
+            int index = response.clickedButtonId();
+            MainThreadPlayerAction.dispatch(plugin, player, () -> {
+                if (SESSIONS.consume(player.getUniqueId(), nonce, scope)
+                        && index >= 0 && index < options.size()) voteHandler.accept(options.get(index));
+            });
+        });
+        form.closedOrInvalidResultHandler(() -> SESSIONS.invalidate(player.getUniqueId(), nonce, scope));
+        boolean sent = BedrockFormSupport.send(player, form.build());
+        if (!sent) SESSIONS.invalidate(player.getUniqueId(), nonce, scope);
+        return sent;
+    }
+
+    public static boolean openDuration(Player player, List<Integer> minutes, IntConsumer voteHandler) {
+        if (!BedrockFormSupport.isBedrock(player)) return false;
+        BuildBattles plugin = BuildBattles.getInstance();
+        if (plugin == null || !plugin.isEnabled()) return false;
+        List<Integer> options = List.copyOf(minutes);
+        String scope = "buildbattles:duration:" + options.hashCode();
+        UUID nonce = SESSIONS.issue(player.getUniqueId(), scope);
+        SimpleForm.Builder form = SimpleForm.builder()
+                .title("§l§6" + BuildBattles.message(player, "bb.form.duration.title"))
+                .content(BuildBattles.message(player, "bb.form.duration.content"));
+        options.forEach(option -> BedrockFormImages.button(form,
+                BedrockButtonText.format(BuildBattles.message(player, "bb.duration.option", option)), MODE_IMAGE));
         BedrockFormImages.button(form, BedrockButtonText.format(
                 BuildBattles.message(player, "bb.form.close")), CLOSE_IMAGE);
         form.validResultHandler(response -> {

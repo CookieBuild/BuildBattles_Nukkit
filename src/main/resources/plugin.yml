@@ -15,6 +15,10 @@ commands:
     description: Vote for the BuildBattles theme while waiting
     usage: /bbtheme <theme>
     permission: buildbattles.play
+  bbduration:
+    description: Vote for the BuildBattles build time while waiting
+    usage: /bbduration <minutes>
+    permission: buildbattles.play
   bbvote:
     description: Score the plot currently being judged
     usage: /bbvote <1-5>

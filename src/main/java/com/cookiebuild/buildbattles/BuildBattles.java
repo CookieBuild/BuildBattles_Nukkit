@@ -21,6 +21,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import com.cookiebuild.buildbattles.game.BuildBattlesGame;
 import com.cookiebuild.buildbattles.game.BuildPhase;
+import com.cookiebuild.buildbattles.game.DurationBallot;
 import com.cookiebuild.buildbattles.game.LateJoinPolicy;
 import com.cookiebuild.buildbattles.game.FloorMaterialResolver;
 import com.cookiebuild.buildbattles.gallery.BuildGalleryService;
@@ -55,6 +56,7 @@ public final class BuildBattles extends JavaPlugin {
             ResourceBundle.Control.getNoFallbackControl(ResourceBundle.Control.FORMAT_PROPERTIES);
     private static BuildBattles instance;
     private NamespacedKey themeKey;
+    private NamespacedKey durationKey;
     private NamespacedKey voteKey;
     private NamespacedKey ratingMenuKey;
     private NamespacedKey paletteShortcutKey;
@@ -123,6 +125,7 @@ public final class BuildBattles extends JavaPlugin {
         migrateConfig();
         LocaleManager.registerBundle("buildbattles_messages");
         themeKey = new NamespacedKey(this, "theme_vote");
+        durationKey = new NamespacedKey(this, "duration_vote");
         voteKey = new NamespacedKey(this, "plot_vote");
         ratingMenuKey = new NamespacedKey(this, "rating_menu");
         paletteShortcutKey = new NamespacedKey(this, "palette_shortcut");
@@ -229,6 +232,16 @@ public final class BuildBattles extends JavaPlugin {
             BuildBattlesGame game = findGame(player);
             if (game == null || !game.voteTheme(player, String.join(" ", args))) {
                 player.sendMessage(Component.text(message(player, "bb.theme.invalid"), NamedTextColor.RED));
+            }
+            return true;
+        });
+        PluginCommand duration = Objects.requireNonNull(getCommand("bbduration"));
+        duration.setExecutor((sender, command, label, args) -> {
+            if (!(sender instanceof Player player) || args.length == 0) return false;
+            BuildBattlesGame game = findGame(player);
+            int minutes = DurationBallot.parseMinutes(String.join(" ", args));
+            if (game == null || !game.voteDuration(player, minutes)) {
+                player.sendMessage(Component.text(message(player, "bb.duration.invalid"), NamedTextColor.RED));
             }
             return true;
         });
@@ -371,6 +384,7 @@ public final class BuildBattles extends JavaPlugin {
     }
 
     public NamespacedKey getThemeKey() { return themeKey; }
+    public NamespacedKey getDurationKey() { return durationKey; }
     public NamespacedKey getVoteKey() { return voteKey; }
     public NamespacedKey getRatingMenuKey() { return ratingMenuKey; }
     public NamespacedKey getPaletteShortcutKey() { return paletteShortcutKey; }

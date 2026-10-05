@@ -18,6 +18,9 @@ class BuildBattlesBedrockFormsContractTest {
                 "openTheme", org.bukkit.entity.Player.class, java.util.List.class,
                 java.util.function.Consumer.class).getReturnType());
         assertEquals(boolean.class, BuildBattlesBedrockForms.class.getDeclaredMethod(
+                "openDuration", org.bukkit.entity.Player.class, java.util.List.class,
+                java.util.function.IntConsumer.class).getReturnType());
+        assertEquals(boolean.class, BuildBattlesBedrockForms.class.getDeclaredMethod(
                 "openRating", org.bukkit.entity.Player.class,
                 java.util.function.IntConsumer.class).getReturnType());
         assertEquals(boolean.class, BuildBattlesBedrockForms.class.getDeclaredMethod(
