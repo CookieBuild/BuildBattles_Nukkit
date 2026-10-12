@@ -2,6 +2,7 @@ package com.cookiebuild.buildbattles.ui;
 
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.IntConsumer;
 import java.util.UUID;
 
@@ -25,6 +26,12 @@ public final class BuildBattlesBedrockForms {
     private BuildBattlesBedrockForms() { }
 
     public static boolean openTheme(Player player, List<String> candidates, Consumer<String> voteHandler) {
+        return openTheme(player, candidates, theme -> null, voteHandler);
+    }
+
+    /** {@code detailOf} gives a theme's second button line (the season of the seasonal candidate) or null. */
+    public static boolean openTheme(Player player, List<String> candidates, Function<String, String> detailOf,
+                                    Consumer<String> voteHandler) {
         if (!BedrockFormSupport.isBedrock(player)) return false;
         BuildBattles plugin = BuildBattles.getInstance();
         if (plugin == null || !plugin.isEnabled()) return false;
@@ -35,7 +42,8 @@ public final class BuildBattlesBedrockForms {
                 .title("§l§6" + BuildBattles.message(player, "bb.form.theme.title"))
                 .content(BuildBattles.message(player, "bb.form.theme.content"));
         options.forEach(theme -> BedrockFormImages.button(form,
-                BedrockButtonText.format(BuildBattles.themeName(player, theme)), MODE_IMAGE));
+                BedrockButtonText.format(BuildBattles.themeName(player, theme),
+                        detailOf == null ? null : detailOf.apply(theme)), MODE_IMAGE));
         BedrockFormImages.button(form, BedrockButtonText.format(
                 BuildBattles.message(player, "bb.form.close")), CLOSE_IMAGE);
         form.validResultHandler(response -> {

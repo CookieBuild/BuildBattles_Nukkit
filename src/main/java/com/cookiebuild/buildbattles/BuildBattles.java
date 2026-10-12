@@ -421,6 +421,32 @@ public final class BuildBattles extends JavaPlugin {
         return themeNameForLocale(Locale.ENGLISH, theme);
     }
 
+    /**
+     * Season shown beside the seasonal vote candidate ("Halloween"), or null when there is no season,
+     * when the bundles do not name it, or when it would only repeat the theme itself.
+     */
+    public static String seasonTag(Player player, String theme, String seasonId) {
+        return seasonTagForLocale(player == null ? Locale.ENGLISH : player.locale(), theme, seasonId);
+    }
+
+    static String seasonTagForLocale(Locale locale, String theme, String seasonId) {
+        if (seasonId == null || seasonId.isBlank()) return null;
+        String season = resolveMessage(locale, "bb.theme.season." + GalleryCapturePolicy.themeKey(seasonId));
+        if (season == null || season.isBlank()) return null;
+        return season.trim().equalsIgnoreCase(themeNameForLocale(locale, theme).trim()) ? null : season.trim();
+    }
+
+    /** Vote label of a candidate: its localized name, prefixed by the season for the seasonal one. */
+    public static String ballotLabel(Player player, String theme, String seasonId) {
+        return ballotLabelForLocale(player == null ? Locale.ENGLISH : player.locale(), theme, seasonId);
+    }
+
+    static String ballotLabelForLocale(Locale locale, String theme, String seasonId) {
+        String name = themeNameForLocale(locale, theme);
+        String season = seasonTagForLocale(locale, theme, seasonId);
+        return season == null ? name : messageForLocale(locale, "bb.theme.seasonal_candidate", season, name);
+    }
+
     private static String resolveMessage(Locale locale, String key, Object... arguments) {
         Locale effectiveLocale = locale == null ? Locale.ENGLISH : locale;
         List<Locale> candidates = new ArrayList<>();

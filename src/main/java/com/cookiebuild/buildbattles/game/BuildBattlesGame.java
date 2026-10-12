@@ -88,6 +88,8 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
 
     private final GameMap map;
     private final ThemeBallot themeBallot;
+    /** Seasonal theme id active when the ballot was drawn (labels its seasonal candidate), else null. */
+    private final String seasonId;
     private final DurationBallot durationBallot;
     private final MatchService matchService = new MatchService(null);
     private final MinigameProgressionService progression = CookieDough.createMinigameProgressionService();
@@ -140,7 +142,10 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         map = java.util.Objects.requireNonNull(preparedMap, "preparedMap");
         setCapacity(template.capacity());
         List<String> themes = BuildBattles.getInstance().getConfig().getStringList("themes");
-        themeBallot = new ThemeBallot(themes,
+        // While a seasonal theme is active, one of its Build Battle themes always joins the vote.
+        SeasonalThemes season = SeasonalThemes.current();
+        seasonId = season.seasonId();
+        themeBallot = new ThemeBallot(themes, season.themes(),
                 BuildBattles.getInstance().getConfig().getInt("game.theme-candidates", 3),
                 ThreadLocalRandom.current());
         durationBallot = new DurationBallot(
@@ -202,7 +207,7 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
             String candidate = themeBallot.candidates().get(index);
             ItemStack paper = new ItemStack(Material.PAPER);
             ItemMeta meta = paper.getItemMeta();
-            meta.displayName(Component.text(BuildBattles.themeName(player, candidate), NamedTextColor.AQUA));
+            meta.displayName(Component.text(ballotLabel(player, candidate), NamedTextColor.AQUA));
             meta.lore(List.of(MenuLore.detail(BuildBattles.message(player, "bb.theme.vote_item_lore"))));
             meta.getPersistentDataContainer().set(BuildBattles.getInstance().getThemeKey(),
                     PersistentDataType.STRING, candidate);
@@ -232,7 +237,8 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         player.sendMessage(themePrompt(player));
         player.sendMessage(durationPrompt(player));
         // Bedrock shows one form at a time: the build-time form follows a theme vote.
-        BuildBattlesBedrockForms.openTheme(player, themeBallot.candidates(), theme -> {
+        BuildBattlesBedrockForms.openTheme(player, themeBallot.candidates(),
+                candidate -> BuildBattles.seasonTag(player, candidate, seasonOf(candidate)), theme -> {
             voteTheme(player, theme);
             if (phase == BuildPhase.WAITING && participants.contains(player.getUniqueId())) {
                 BuildBattlesBedrockForms.openDuration(player, durationBallot.options(),
@@ -266,12 +272,21 @@ public final class BuildBattlesGame extends Game implements ReconnectableGame {
         Component prompt = Component.text(BuildBattles.message(player, "bb.theme.prompt") + " ", NamedTextColor.YELLOW);
         for (String candidate : themeBallot.candidates()) {
             String displayTheme = BuildBattles.themeName(player, candidate);
-            prompt = prompt.append(Component.text("[" + displayTheme + "] ", NamedTextColor.AQUA)
+            prompt = prompt.append(Component.text("[" + ballotLabel(player, candidate) + "] ", NamedTextColor.AQUA)
                     .clickEvent(ClickEvent.runCommand("/bbtheme " + candidate))
                     .hoverEvent(HoverEvent.showText(Component.text(
                             BuildBattles.message(player, "bb.theme.vote_hover", displayTheme)))));
         }
         return prompt;
+    }
+
+    /** Season of a vote candidate: only the ballot's seasonal candidate has one. */
+    private String seasonOf(String candidate) {
+        return themeBallot.isSeasonal(candidate) ? seasonId : null;
+    }
+
+    private String ballotLabel(Player player, String candidate) {
+        return BuildBattles.ballotLabel(player, candidate, seasonOf(candidate));
     }
 
     public boolean voteTheme(Player player, String requested) {

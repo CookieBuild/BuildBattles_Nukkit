@@ -17,6 +17,10 @@ class BuildBattlesBedrockFormsContractTest {
         assertEquals(boolean.class, BuildBattlesBedrockForms.class.getDeclaredMethod(
                 "openTheme", org.bukkit.entity.Player.class, java.util.List.class,
                 java.util.function.Consumer.class).getReturnType());
+        // Seasonal ballots add the season as the second line of the seasonal candidate's button.
+        assertEquals(boolean.class, BuildBattlesBedrockForms.class.getDeclaredMethod(
+                "openTheme", org.bukkit.entity.Player.class, java.util.List.class,
+                java.util.function.Function.class, java.util.function.Consumer.class).getReturnType());
         assertEquals(boolean.class, BuildBattlesBedrockForms.class.getDeclaredMethod(
                 "openDuration", org.bukkit.entity.Player.class, java.util.List.class,
                 java.util.function.IntConsumer.class).getReturnType());
