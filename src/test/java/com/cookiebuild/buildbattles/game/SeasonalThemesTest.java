@@ -5,11 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
 import com.cookiebuild.cookiedough.theme.ThemeService;
+import com.cookiebuild.cookiedough.theme.ThemeServiceFixtures;
 
 class SeasonalThemesTest {
     @Test
@@ -31,5 +35,24 @@ class SeasonalThemesTest {
         SeasonalThemes empty = new SeasonalThemes("halloween", List.of());
         assertNull(empty.seasonId());
         assertEquals(SeasonalThemes.NONE, new SeasonalThemes("halloween", null));
+    }
+
+    @Test
+    void activeChristmasThemeFeedsExactlyOneChristmasThemeIntoEveryBallot() {
+        ThemeService service = ThemeServiceFixtures.active("christmas", ThemeBallotTest.CHRISTMAS);
+        SeasonalThemes christmas = SeasonalThemes.of(service);
+        assertEquals("christmas", christmas.seasonId());
+        assertEquals(ThemeBallotTest.CHRISTMAS, christmas.themes());
+
+        Set<String> featured = new HashSet<>();
+        for (long seed = 0; seed < 1_000; seed++) {
+            ThemeBallot ballot = new ThemeBallot(ThemeBallotTest.REGULAR, christmas.themes(), 3, new Random(seed));
+            List<String> candidates = ballot.candidates();
+            assertEquals(3, candidates.size());
+            assertEquals(1, candidates.stream().filter(ThemeBallotTest.CHRISTMAS::contains).count(),
+                    "seed " + seed + " " + candidates);
+            featured.add(ballot.seasonalCandidate().orElseThrow());
+        }
+        assertEquals(Set.copyOf(ThemeBallotTest.CHRISTMAS), featured);
     }
 }

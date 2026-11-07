@@ -2,17 +2,23 @@ package com.cookiebuild.buildbattles;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.ResourceBundle;
+import java.util.Set;
 
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
 
 import com.cookiebuild.buildbattles.gallery.GalleryCapturePolicy;
@@ -29,6 +35,10 @@ class BuildBattlesThemeLocalizationTest {
     /** Halloween list delivered by CookieDough's ThemeService (release halloween-20261012 contract). */
     private static final List<String> HALLOWEEN = List.of("Haunted House", "Witch Cauldron", "Graveyard",
             "Pumpkin", "Ghost", "Vampire", "Giant Spider", "Candy", "Halloween", "Skeleton");
+    /** Christmas list of the christmas-20261107 contract (Snowman is also a regular theme). */
+    private static final List<String> CHRISTMAS = List.of("Snowman", "Christmas Tree", "Santa Claus", "Reindeer",
+            "Gingerbread House", "Gift", "Sleigh", "Igloo", "Penguin", "Fireplace");
+    private static final Map<String, List<String>> SEASONS = Map.of("halloween", HALLOWEEN, "christmas", CHRISTMAS);
 
     @Test
     void everyConfiguredThemeHasALocalizedDisplayNameInCompleteLocales() throws IOException {
@@ -79,22 +89,7 @@ class BuildBattlesThemeLocalizationTest {
     void everySeasonalThemeHasALocalizedNameInEveryLocale() {
         for (Locale locale : ALL_LOCALES) {
             ResourceBundle bundle = bundle(locale);
-            for (String theme : HALLOWEEN) {
-                String key = BuildBattles.themeMessageKey(theme);
-                assertTrue(bundle.containsKey(key), locale + " missing " + key);
-                String name = bundle.getString(key);
-                assertFalse(name.isBlank(), locale + " blank " + key);
-                assertTrue(name.length() <= 24, locale + " too long for the scoreboard: " + name);
-                assertTrue(name.codePoints().noneMatch(BuildBattlesThemeLocalizationTest::isEmojiLike),
-                        locale + " emoji in " + name);
-                if (LATIN_LOCALES.contains(locale)) {
-                    assertTrue(StandardCharsets.ISO_8859_1.newEncoder().canEncode(name),
-                            locale + " not Latin-1: " + name);
-                }
-            }
-            String season = bundle.getString("bb.theme.season.halloween");
-            assertFalse(season.isBlank(), locale + " blank season");
-            assertTrue(season.codePoints().noneMatch(BuildBattlesThemeLocalizationTest::isEmojiLike));
+            SEASONS.forEach((seasonId, themes) -> assertSeasonNamed(locale, bundle, seasonId, themes));
             assertTrue(bundle.getString("bb.theme.seasonal_candidate").contains("{0}"));
             assertTrue(bundle.getString("bb.theme.seasonal_candidate").contains("{1}"));
         }
@@ -104,8 +99,79 @@ class BuildBattlesThemeLocalizationTest {
     }
 
     @Test
+    void christmasThemesHaveShortNaturalNames() {
+        assertEquals("Sapin de Noël", BuildBattles.themeNameForLocale(Locale.FRENCH, "Christmas Tree"));
+        assertEquals("Père Noël", BuildBattles.themeNameForLocale(Locale.FRENCH, "Santa Claus"));
+        assertEquals("Maison en pain d'épices", BuildBattles.themeNameForLocale(Locale.FRENCH, "Gingerbread House"));
+        assertEquals("Traîneau", BuildBattles.themeNameForLocale(Locale.FRENCH, "Sleigh"));
+        assertEquals("Weihnachtsmann", BuildBattles.themeNameForLocale(Locale.GERMAN, "Santa Claus"));
+        assertEquals("Papai Noel", BuildBattles.themeNameForLocale(Locale.of("pt", "BR"), "Santa Claus"));
+        assertEquals("Fireplace", BuildBattles.englishThemeName("Fireplace"));
+        // Snowman was already a regular theme: Christmas reuses its existing key and names.
+        assertEquals("bb.theme.name.snowman", BuildBattles.themeMessageKey("Snowman"));
+        assertEquals("Bonhomme de neige", BuildBattles.themeNameForLocale(Locale.FRENCH, "Snowman"));
+        // Each Christmas theme has its own key: no two themes share a display key.
+        assertEquals(CHRISTMAS.size(), CHRISTMAS.stream().map(BuildBattles::themeMessageKey).distinct().count());
+        assertEquals("Noël : Sapin de Noël",
+                BuildBattles.ballotLabelForLocale(Locale.FRENCH, "Christmas Tree", "christmas"));
+        assertEquals("Noël : Bonhomme de neige",
+                BuildBattles.ballotLabelForLocale(Locale.FRENCH, "Snowman", "christmas"));
+        assertEquals("Christmas: Reindeer", BuildBattles.ballotLabelForLocale(Locale.ENGLISH, "Reindeer", "christmas"));
+        assertEquals("Коледа: Шейна", BuildBattles.ballotLabelForLocale(Locale.of("bg"), "Sleigh", "christmas"));
+        assertEquals("Christmas: Penguin", BuildBattles.ballotLabelForLocale(Locale.JAPANESE, "Penguin", "christmas"));
+    }
+
+    /**
+     * Every Build Battle theme listed by a seasonal theme bundled in CookieDough
+     * ({@code themes/index.yml} then {@code themes/<id>/theme.yml}) is translated in every bundle,
+     * so a season added to the core cannot show a raw English name or an unnamed season.
+     */
+    @Test
+    void everyBundledSeasonalThemeIsTranslated() throws IOException {
+        ClassLoader loader = BuildBattlesThemeLocalizationTest.class.getClassLoader();
+        List<String> ids = yamlList(loader, "themes/index.yml", "themes");
+        assertTrue(ids.contains("halloween"), ids.toString());
+        for (String id : ids) {
+            List<String> themes = yamlList(loader, "themes/" + id + "/theme.yml", "build-battle-themes");
+            if (themes.isEmpty()) continue;
+            if (SEASONS.containsKey(id)) assertEquals(Set.copyOf(SEASONS.get(id)), Set.copyOf(themes), id);
+            for (Locale locale : ALL_LOCALES) assertSeasonNamed(locale, bundle(locale), id, themes);
+        }
+    }
+
+    private static List<String> yamlList(ClassLoader loader, String resource, String key) throws IOException {
+        try (InputStream in = loader.getResourceAsStream(resource)) {
+            assertNotNull(in, "missing " + resource);
+            YamlConfiguration yaml = YamlConfiguration.loadConfiguration(
+                    new InputStreamReader(in, StandardCharsets.UTF_8));
+            return yaml.getStringList(key);
+        }
+    }
+
+    private static void assertSeasonNamed(Locale locale, ResourceBundle bundle, String seasonId, List<String> themes) {
+        for (String theme : themes) {
+            String key = BuildBattles.themeMessageKey(theme);
+            assertTrue(bundle.containsKey(key), locale + " missing " + key);
+            String name = bundle.getString(key);
+            assertFalse(name.isBlank(), locale + " blank " + key);
+            assertTrue(name.length() <= 24, locale + " too long for the scoreboard: " + name);
+            assertTrue(name.codePoints().noneMatch(BuildBattlesThemeLocalizationTest::isEmojiLike),
+                    locale + " emoji in " + name);
+            if (LATIN_LOCALES.contains(locale)) {
+                assertTrue(StandardCharsets.ISO_8859_1.newEncoder().canEncode(name),
+                        locale + " not Latin-1: " + name);
+            }
+        }
+        String seasonKey = "bb.theme.season." + seasonId;
+        assertTrue(bundle.containsKey(seasonKey), locale + " missing " + seasonKey);
+        String season = bundle.getString(seasonKey);
+        assertFalse(season.isBlank(), locale + " blank season");
+        assertTrue(season.codePoints().noneMatch(BuildBattlesThemeLocalizationTest::isEmojiLike));
+    }
+
+    @Test
     void seasonalThemesStayWithinTheGalleryColumns() {
-        for (String theme : HALLOWEEN) {
+        for (String theme : SEASONS.values().stream().flatMap(List::stream).toList()) {
             String key = GalleryCapturePolicy.themeKey(theme);
             assertTrue(key.matches("[a-z0-9_]{1,64}"), key);
             String englishName = BuildBattles.englishThemeName(theme);
@@ -117,6 +183,9 @@ class BuildBattlesThemeLocalizationTest {
         assertEquals("witch_cauldron", GalleryCapturePolicy.themeKey("Witch Cauldron"));
         assertEquals("giant_spider", GalleryCapturePolicy.themeKey("Giant Spider"));
         assertEquals("Witch's Cauldron", BuildBattles.englishThemeName("Witch Cauldron"));
+        assertEquals("christmas_tree", GalleryCapturePolicy.themeKey("Christmas Tree"));
+        assertEquals("santa_claus", GalleryCapturePolicy.themeKey("Santa Claus"));
+        assertEquals("gingerbread_house", GalleryCapturePolicy.themeKey("Gingerbread House"));
     }
 
     @Test

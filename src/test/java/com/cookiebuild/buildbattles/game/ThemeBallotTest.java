@@ -20,8 +20,11 @@ class ThemeBallotTest {
     /** Halloween list delivered by CookieDough's ThemeService (release halloween-20261012 contract). */
     private static final List<String> HALLOWEEN = List.of("Haunted House", "Witch Cauldron", "Graveyard",
             "Pumpkin", "Ghost", "Vampire", "Giant Spider", "Candy", "Halloween", "Skeleton");
-    /** Production config.yml themes (Candy, Halloween and Skeleton are also seasonal). */
-    private static final List<String> REGULAR = List.of("Farm", "Summer", "Camping", "Volcano", "House",
+    /** Christmas list of the christmas-20261107 contract (Snowman is also a regular theme). */
+    static final List<String> CHRISTMAS = List.of("Snowman", "Christmas Tree", "Santa Claus", "Reindeer",
+            "Gingerbread House", "Gift", "Sleigh", "Igloo", "Penguin", "Fireplace");
+    /** Production config.yml themes (Candy, Halloween, Skeleton and Snowman are also seasonal). */
+    static final List<String> REGULAR = List.of("Farm", "Summer", "Camping", "Volcano", "House",
             "Candle", "Rabbit", "Pizza", "Car", "Emoji", "Smartphone", "Candy", "Birds", "Skyscraper", "Desk",
             "Fast Food", "Dragon", "Snowman", "Restaurant", "Tank", "Nintendo", "Mario", "Clock", "Basketball",
             "Ice Cream", "Shop", "Shoes", "Maze", "Magic", "Winter", "Soccer", "Airplane", "Pokemon", "Minions",
@@ -167,6 +170,39 @@ class ThemeBallotTest {
         assertFalse(ballot.isSeasonal(null));
         assertTrue(HALLOWEEN.stream().filter(theme -> !theme.equals(seasonal))
                 .noneMatch(theme -> ballot.canonicalCandidate(theme) != null));
+    }
+
+    @Test
+    void christmasBallotAlwaysFeaturesExactlyOneChristmasTheme() {
+        Set<String> christmasKeys = lowerCase(CHRISTMAS);
+        Set<String> featured = new HashSet<>();
+        for (long seed = 0; seed < 2_000; seed++) {
+            ThemeBallot ballot = new ThemeBallot(REGULAR, CHRISTMAS, 3, new Random(seed));
+            List<String> candidates = ballot.candidates();
+            assertEquals(3, candidates.size(), "seed " + seed);
+            assertEquals(3, lowerCase(candidates).size(), "duplicate in " + candidates);
+            assertEquals(1, candidates.stream().filter(c -> christmasKeys.contains(c.toLowerCase(Locale.ROOT)))
+                    .count(), "seed " + seed + " " + candidates);
+            String seasonal = ballot.seasonalCandidate().orElseThrow();
+            assertTrue(CHRISTMAS.contains(seasonal));
+            // The other candidates are regular themes, never a Halloween-only one.
+            candidates.stream().filter(c -> !ballot.isSeasonal(c))
+                    .forEach(c -> assertTrue(REGULAR.contains(c) && !c.equals("Snowman"), c));
+            featured.add(seasonal);
+        }
+        assertEquals(Set.copyOf(CHRISTMAS), featured);
+    }
+
+    @Test
+    void snowmanIsProposedOnceEvenThoughItIsAlsoARegularTheme() {
+        for (long seed = 0; seed < 500; seed++) {
+            ThemeBallot ballot = new ThemeBallot(REGULAR, CHRISTMAS, 4, new Random(seed));
+            assertTrue(ballot.candidates().stream().filter(c -> c.equalsIgnoreCase("Snowman")).count() <= 1,
+                    ballot.candidates().toString());
+        }
+        ThemeBallot onlySnowman = new ThemeBallot(List.of("Farm", "Snowman"), List.of("Snowman"), 3, new Random(5));
+        assertEquals(Set.of("Farm", "Snowman"), Set.copyOf(onlySnowman.candidates()));
+        assertTrue(onlySnowman.isSeasonal("Snowman"));
     }
 
     /** Production draw before the seasonal ballot (a3eb6bc), kept to prove it is unchanged. */
